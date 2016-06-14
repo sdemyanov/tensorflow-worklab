@@ -46,3 +46,10 @@ Set up the path to the model to restore in Session class. For example, use [this
 HOW TO SPECIFY THE INPUT
 
 Currently the reader file needs two lists of image filenames and their labels, for training and testing. If your data is stored in other format, adjust the reader accoring to your needs using other examples of Tensorflow, such as MNIST and CIFAR-10.
+
+POTENTIAL PROBLEMS
+
+In the current version (v0.8) of Tensorflow you cannot specify 1x1 convolutions with stride > 1, which are requred by ResNet models. To overcome this problem, install the latest nightly build. You can find it [here](ci.tensorflow.org/view/Nightly/job/nigntly-matrix-linux-gpu). Install it using
+```
+sudo pip install --upgrade /path/to/build/build.whl
+```

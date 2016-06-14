@@ -34,9 +34,9 @@ HOW TO RETRAIN A MODEL
 In the Network class you specify your model. You start from defining the primitives (batch_norm, conv_layer, pool_layer, etc), based on that define the main network blocks (such as ResNet blocks), and define the whole network in the _construct function. No need to specify each block manually, you can use loops. For each and layer you can specify lr_mult, which is used to adjust the learning rate for this layer. If it is zero, the layer will remain fixed. 
 
 Scopes are used to define the variable names, and visualize the graph in Tensorboard. Adjust them for your purpose. In order to find the variable names of an existing model, use the command
-
+```
 python /path/to/tensorflow/utils/inspect_checkpoint.py --file_name=/path/to/pretrained_model/model.ckpt
-
+```
 The inspect_checkpoint.py file can be found in 'tensorflow/python/tools' folder of the Tensorflow source, which you can download from GitHub.
 
 This script will show you the variable names, their types and sizes. Use 'restscope' parameter to specify mapping of these filenames to your model, defined in Network class. If you want to adjust the architecture (for example, change the last layer on another one with a different number of classes), define the parameter 'restore=False' to specify that these variables need to be initialized from scratch and will not be restored.

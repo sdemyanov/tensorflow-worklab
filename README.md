@@ -7,27 +7,27 @@ This set of files is an example of how to use Tensorflow for importing and retra
 
 CLASSES
 
-- Reader - specifies the input, performs data augmentation and outputs training and testing batches. Input is specified as a list of image filenames and their lables. 
+- **Reader** - specifies the input, performs data augmentation and outputs training and testing batches. Input is specified as a list of image filenames and their lables. 
 
-- Network - specifies the new model for training, name mapping to the pretrained model, loss function, learning rate coefficients.
+- **Network** - specifies the new model for training, name mapping to the pretrained model, loss function, learning rate coefficients.
 
-- Trainer - contains the main training loop, and specifies the parameters for training (batch size, learning rates, number of steps, etc).
+- **Trainer** - contains the main training loop, and specifies the parameters for training (batch size, learning rates, number of steps, etc).
 
-- Tester - contains the testing loop, and specifies the statistics to observe.
+- **Tester** - contains the testing loop, and specifies the statistics to observe.
 
-- Session - incorporates all initialization, running, saving and restoring operations.
+- **Session** - incorporates all initialization, running, saving and restoring operations.
 
-- Writer - contains functions to write summaries for Tensorboard
+- **Writer** - contains functions to write summaries for Tensorboard
 
 The following scripts are created for launching:
 
-- train_and_test - sequentially runs training and testing operations in order to track the performance
+- **train_and_test** - sequentially runs training and testing operations in order to track the performance
 
-- train - runs only training for a specified number of iterations
+- **train** - runs only training for a specified number of iterations
 
-- test - runs only testing for a specified number of iterations
+- **test** - runs only testing for a specified number of iterations
 
-- test_many - runs testing every time a new model appears in the saving folder. Can be run in parallel with training, but doubles the consumed amount of memory.
+- **test_many** - runs testing every time a new model appears in the saving folder. Can be run in parallel with training, but doubles the consumed amount of memory.
 
 HOW TO RETRAIN A MODEL
 

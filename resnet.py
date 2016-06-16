@@ -17,8 +17,6 @@ class Network(object):
   STDDEV = 1e-4
   BN_EPS = 1e-5
 
-  TOWER_NAME = 'tower'
-  OUTPUT_NAME = 'output'
   LOSSES_NAME = 'losses'
   TRAINING_PREFIX = 'training'
   TESTING_PREFIX = 'testing'
@@ -337,6 +335,7 @@ class Network(object):
 
     return output
 
+
   """
   def _add_loss_summaries(self, total_loss):
     # loss for test is obtained directly from each batch
@@ -372,9 +371,8 @@ class Network(object):
   """
   def output(self):
     return self._output
-  """
 
-  """
+
   def accuracy(self, labels):
     with tf.variable_scope('accuracy'):
       #predicted = tf.argmax(self._output, dimension=1)

@@ -35,15 +35,16 @@ import writer
 reload(writer)
 from writer import Writer
 
-#import utils.flags
-#params = {'log_device_placement': False}
-#utils.flags.init_flags(params)
-#FLAGS = tf.app.flags.FLAGS
+RESULTS_DIR = 'results'
+
+EVAL_FREQUENCY = 500
+LEARNING_RATE = 0.01
 
 def main(argv=None):
-  writer = Writer(dname)
-  trainer = Trainer(dname, 'train', writer)
-  trainer.train()
+  results_dir = os.path.join(dname, RESULTS_DIR)
+  writer = Writer(results_dir)
+  trainer = Trainer(results_dir, 'train', writer)
+  trainer.train(LEARNING_RATE, EVAL_FREQUENCY)
 
 
 if __name__ == '__main__':

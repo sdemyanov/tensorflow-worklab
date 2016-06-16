@@ -11,6 +11,7 @@ from tensorflow.python.framework import dtypes
 import cPickle as pickle
 import os
 import math
+#import functools
 
 import sys
 sys.path.append('./')
@@ -19,7 +20,7 @@ reload(utils.resize_image_patch)
 
 class Reader(object):
 
-  LIST_DIR = 'filelists'
+  LIST_DIR = './filelists'
   FOLD_NAMES = {'train': 'train.dic',
                 'valid': 'valid.dic',
                 'test': 'test.dic'}
@@ -29,13 +30,13 @@ class Reader(object):
   MEAN_CHANNEL_VALUES = [194, 161, 155]
   MAX_PIXEL_VALUE = 255
   MIN_INPUT_SIZE = 600
-  IMAGE_TYPE_SIZE = 4 #bytes
 
-  SCALE_RATIO = 1.0
-  ZOOM_RANGE = [1.1, 1.8]
-  ZOOM_MEAN = (ZOOM_RANGE[0] + ZOOM_RANGE[0]) / 2
+  SCALE_RATIO = 2.0
+  #ZOOM_RANGE = [1.1, 1.8]
+  #ZOOM_MEAN = (ZOOM_RANGE[0] + ZOOM_RANGE[0]) / 2
   SCALE_SIZE = 256
-  assert MIN_INPUT_SIZE / SCALE_RATIO / ZOOM_RANGE[1] >= SCALE_SIZE
+  SCALE_SIZE = 300
+  #assert MIN_INPUT_SIZE / SCALE_RATIO / ZOOM_RANGE[1] >= SCALE_SIZE
   CROP_SHAPE = (SCALE_SIZE, SCALE_SIZE, CHANNEL_NUM)
   IMAGE_SIZE = 224
 
@@ -47,12 +48,11 @@ class Reader(object):
   BRIGHTNESS_DELTA = 0.25
   MIN_CONTRAST_FACTOR = 0.5
   MAX_CONTRAST_FACTOR = 1.8
-  MEAN_CONTRAST_FACTOR = math.sqrt(MIN_CONTRAST_FACTOR * MAX_CONTRAST_FACTOR)
 
 
-  def __init__(self, main_dir, fold_name):
-    fold_path = os.path.join(main_dir, Reader.LIST_DIR, Reader.FOLD_NAMES[fold_name])
-    assert tf.gfile.Exists(fold_path)
+  def __init__(self, fold_name):
+    fold_path = os.path.join(Reader.LIST_DIR, Reader.FOLD_NAMES[fold_name])
+    assert os.path.exists(fold_path)
     self._read_fold_list(fold_path)
     self._get_filenames()
 
@@ -83,6 +83,20 @@ class Reader(object):
 
   def _generate_image_and_label_batch(self, image, label, filename,
                                       batch_size, min_queue_examples, shuffle):
+    """Construct a queued batch of images and labels.
+
+    Args:
+      image: 3-D Tensor of [height, width, 3] of type.float32.
+      label: 1-D Tensor of type.int32
+      min_queue_examples: int32, minimum number of samples to retain
+        in the queue that provides of batches of examples.
+      batch_size: Number of images per batch.
+      shuffle: boolean indicating whether to use a shuffling queue.
+
+    Returns:
+      images: Images. 4D tensor of [batch_size, height, width, 3] size.
+      labels: Labels. 1D tensor of [batch_size] size.
+    """
     # Create a queue that shuffles the examples, and then
     # read 'batch_size' images + labels from the example queue.
     num_preprocess_threads = 16
@@ -133,16 +147,15 @@ class Reader(object):
   def _zoom_and_crop(self, image, size, zoom=None):
     # if no zoom is given, we use max possible zoom
     with tf.variable_scope('zoom_and_crop'):
-      imshape = tf.to_float(tf.shape(image))
-      minsize = tf.minimum(imshape[0], imshape[1])
-      maxcoef = float(size+1) / minsize
       if (zoom is not None):
+        imshape = tf.to_float(tf.shape(image))
+        minsize = tf.minimum(imshape[0], imshape[1])
+        maxcoef = float(size+1) / minsize
         zoomcoef = 1.0/zoom
-      else:
-        zoomcoef = maxcoef
-      rescoef = maxcoef / zoomcoef
-      new_size = tf.to_int32(imshape * rescoef) + 1
-      image = tf.image.resize_images(image, new_size[0], new_size[1])
+        rescoef = maxcoef / zoomcoef
+        new_size = tf.to_int32(imshape * rescoef) + 1
+        image = tf.image.resize_images(image, new_size[0], new_size[1])
+
       image = tf.image.resize_image_with_crop_or_pad(
         image, size, size, dynamic_shape=True
       )
@@ -166,13 +179,12 @@ class Reader(object):
 
   def _train_transform(self, image):
     with tf.variable_scope('train_transform'):
-      image = self._random_zoom_and_crop(image, Reader.ZOOM_RANGE, Reader.SCALE_SIZE)
+      #image = self._random_zoom_and_crop(image, Reader.ZOOM_RANGE, Reader.SCALE_SIZE)
+      image = self._scale_and_crop(image, Reader.SCALE_SIZE)
       image_shape = (Reader.IMAGE_SIZE, Reader.IMAGE_SIZE, Reader.CHANNEL_NUM)
       image = tf.random_crop(image, image_shape)
       image = self._random_rotate90(image)
       image = tf.image.random_flip_left_right(image)
-      # Image processing for training the network. Note the many random
-      # distortions applied to the image.
       delta = Reader.BRIGHTNESS_DELTA * Reader.MAX_PIXEL_VALUE
       image = tf.image.random_brightness(image, max_delta=delta)
       image = tf.image.random_contrast(image,
@@ -183,13 +195,11 @@ class Reader(object):
 
   def _test_transform(self, image):
     with tf.variable_scope('test_transform'):
-      image = self._zoom_and_crop(image, Reader.SCALE_SIZE, Reader.ZOOM_MEAN)
+      #image = self._zoom_and_crop(image, Reader.SCALE_SIZE, Reader.ZOOM_MEAN)
+      image = self._scale_and_crop(image, Reader.SCALE_SIZE)
       image = self._central_crop(image, Reader.IMAGE_SIZE)
-      # Crop from random horizontal location, as vertical is alrease SCALE_SIZE
-      #image = tf.random_crop(image, Reader.CROP_SHAPE)
-
-      #image = tf.random_crop(image, Reader.IMAGE_SHAPE)
-      image = tf.image.adjust_contrast(image, Reader.MEAN_CONTRAST_FACTOR)
+      mean_contrast = math.sqrt(Reader.MIN_CONTRAST_FACTOR * Reader.MAX_CONTRAST_FACTOR)
+      image = tf.image.adjust_contrast(image, mean_contrast)
       return image
 
 
@@ -207,9 +217,6 @@ class Reader(object):
 
       image = self._scale_and_crop(image, Reader.MIN_INPUT_SIZE)
       # now the image have shape, which we can use
-
-      #image_shape = (Reader.IMAGE_SIZE, Reader.IMAGE_SIZE, Reader.CHANNEL_NUM)
-      #image = tf.random_crop(image, image_shape)
       if (is_train):
         image = self._train_transform(image)
       else:

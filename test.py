@@ -31,11 +31,18 @@ import tester
 reload(tester)
 from tester import Tester
 
-EVAL_STEP_NUM = None
+#import writer
+#reload(writer)
+#from writer import Writer
+
+RESULTS_DIR = 'results'
+EVAL_STEP_NUM = 50
 
 def main(argv=None):  # pylint: disable=unused-argument
-  tester = Tester(dname, 'test')
-  tester.test(step_num=EVAL_STEP_NUM)
+  results_dir = os.path.join(dname, RESULTS_DIR)
+  #writer = Writer(dname)
+  tester = Tester(results_dir, 'test')#, writer)
+  tester.test(EVAL_STEP_NUM, 35500)
 
 
 if __name__ == '__main__':

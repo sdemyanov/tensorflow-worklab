@@ -6,14 +6,11 @@ Created on Mon May 30 14:18:45 2016
 """
 
 import tensorflow as tf
-import os
 
 class Writer(object):
 
-  SUMMARY_DIR = 'results'
-
   def __init__(self, path):
-    self._path = os.path.join(path, Writer.SUMMARY_DIR)
+    self._path = path
     print('Writer summary folder: %s' %self._path)
     if not tf.gfile.Exists(self._path):
       tf.gfile.MakeDirs(self._path)
@@ -26,7 +23,7 @@ class Writer(object):
 
 
   def write_summaries(self, summary_str, step):
-    print('Writing summaries to %s' %self._path)
+    print('Writing string summaries to %s' %self._path)
     summary = tf.Summary()
     summary.ParseFromString(summary_str)
     self._writer.add_summary(summary, step)

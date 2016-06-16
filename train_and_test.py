@@ -39,17 +39,41 @@ import writer
 reload(writer)
 from writer import Writer
 
-EVAL_FREQUENCY = 500
+RESULTS_DIR = 'results'
+PARAMS_FILE = 'params'
+
 EVAL_STEP_NUM = 50
+DECAY_FACTOR = 0.1
+
+#CHANGE
+LEARNING_RATE = 0.01
+EVAL_FREQUENCY = 500
+STEP_VALUES = [20, 40]
+LAST_STEP = STEP_VALUES[-1]
+
+
+def learning_rate(step):
+  lr = LEARNING_RATE
+  for i in xrange(len(STEP_VALUES)):
+    if (step > STEP_VALUES[i]):
+      lr *= DECAY_FACTOR
+    else:
+      break
+  return lr
+
 
 def main(argv=None):
-  writer = Writer(dname)
-  trainer = Trainer(dname, 'train', writer)
-  tester = Tester(dname, 'valid', writer)
-  step = 0
-  while (step < Trainer.LAST_STEP):
-    step = trainer.train(step_num=EVAL_FREQUENCY)
-    tester.test(step_num=EVAL_STEP_NUM)
+
+  results_dir = os.path.join(dname, RESULTS_DIR)
+  writer = Writer(results_dir)
+  trainer = Trainer(results_dir, 'train', writer)
+  tester = Tester(results_dir, 'valid', writer)
+
+  step, _ = tester.test(EVAL_STEP_NUM)
+  while (step < LAST_STEP):
+    lr = learning_rate(step)
+    step, _ = trainer.train(lr, EVAL_FREQUENCY, step)
+    tester.test(EVAL_STEP_NUM, step)
 
 
 if __name__ == '__main__':

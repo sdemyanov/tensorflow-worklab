@@ -11,23 +11,26 @@ CLASSES
 
 - **Network** - specifies the new model for training, name mapping to the pretrained model, loss function, learning rate coefficients.
 
-- **Trainer** - contains the main training loop, and specifies the parameters for training (batch size, learning rates, number of steps, etc).
+- **Trainer** - contains the main training loop, and stores the results of training.
 
 - **Tester** - contains the testing loop, and specifies the statistics to observe.
 
 - **Session** - incorporates all initialization, running, saving and restoring operations.
 
-- **Writer** - contains functions to write summaries for Tensorboard
+- **Writer** - contains functions to write summaries for Tensorboard.
 
 The following scripts are created for launching:
 
-- **train_and_test** - sequentially runs training and testing operations in order to track the performance
+- **train** - runs only training for a specified number of iterations.
 
-- **train** - runs only training for a specified number of iterations
-
-- **test** - runs only testing for a specified number of iterations
+- **test** - runs only testing for a specified number of iterations.
 
 - **test_many** - runs testing every time a new model appears in the saving folder. Can be run in parallel with training, but doubles the consumed amount of memory.
+
+- **train_and_test** - sequentially runs training and testing operations using the predefined sequence of learning rates.
+
+- **train_with_patience** - sequentially runs training and testing operations, and drops the learning rate when the test loss stops decreasing.
+
 
 HOW TO RETRAIN A MODEL
 
@@ -49,7 +52,9 @@ Currently the reader file needs two lists of image filenames and their labels, f
 
 POTENTIAL PROBLEMS
 
-In the current version (v0.8) of Tensorflow you cannot specify 1x1 convolutions with stride > 1, which are requred by ResNet models. To overcome this problem, install the latest nightly build. You can find it [here](ci.tensorflow.org/view/Nightly/job/nigntly-matrix-linux-gpu). Install it using
+- First of all, adjust all the paths and other parameters to your own! Prepare file lists and their labels! The example is not supposed to be launched immediately.
+
+- In the current version (v0.8) of Tensorflow you cannot specify 1x1 convolutions with stride > 1, which are requred by ResNet models. To overcome this problem, install the latest nightly build. You can find it [here](ci.tensorflow.org/view/Nightly/job/nigntly-matrix-linux-gpu). Install it using
 ```
 sudo pip install --upgrade /path/to/build/build.whl
 ```

@@ -36,18 +36,21 @@ import writer
 reload(writer)
 from writer import Writer
 
+RESULTS_DIR = 'results'
+
 INTERVAL = 3
 EVAL_STEP_NUM = 50
 
 def main(argv=None):
-  writer = Writer(dname)
-  tester = Tester(dname, 'valid', writer)
-  status_file = os.path.join(tester.models_dir, 'checkpoint')
+  results_dir = os.path.join(dname, RESULTS_DIR)
+  writer = Writer(results_dir)
+  tester = Tester(results_dir, 'valid', writer)
+  status_file = os.path.join(results_dir, 'checkpoint')
   last_update = 0
   while True:
     cur_time = os.stat(status_file).st_mtime
     if (cur_time > last_update):
-      tester.test(step_num=EVAL_STEP_NUM)
+      tester.test(EVAL_STEP_NUM)
       last_update = cur_time
     time.sleep(INTERVAL)
 

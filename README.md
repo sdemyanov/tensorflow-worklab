@@ -58,3 +58,5 @@ POTENTIAL PROBLEMS
 ```
 sudo pip install --upgrade /path/to/build/build.whl
 ```
+
+- The moving average variables, which are used trach the batch mean and variance, are initialized by 0. If you have a decay very close to 1, it will take a while for them to approach the real mean and variance. Therefore, if you don't restore a pretrained model, set the decay to be around 0.7, run for several iterations, and then change it back to 0.99 or so.

@@ -1,13 +1,13 @@
 # tensorflow-worklab
 Copyright (C) 2016 Sergey Demyanov
 
-Email: my_name [at] my_sirname.net
+Email: my_name@my_sirname.net
 
 This set of files is an example of how to use Tensorflow for importing and retraining an existing model, such as ResNet. The goal of this example is to separate all functionality on several classes to make it easy to modify the parameters and run the models, while still having all code not too deep inside. 
 
 CLASSES
 
-- **Reader** - specifies the input, performs data augmentation and outputs training and testing batches. *Input is specified as a list of image filenames and their lables.*
+- **Reader** - specifies the input, performs data augmentation and outputs training and testing batches. *Input is specified as a json file with image file paths and their lables.*
 
 - **Network** - specifies the new model for training, name mapping to the pretrained model, loss function, learning rate coefficients.
 
@@ -46,9 +46,6 @@ This script will show you the variable names, their types and sizes. Use the *re
 
 Set up the path to the model to restore in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A model to restore is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, including those with the parameter 'restore=False'. Therefore, you can stop and start training at any time.
 
-HOW TO SPECIFY THE INPUT
-
-Currently the reader file needs two lists of image filenames and their labels, for training and testing. If your data is stored in other format, adjust the reader accoring to your needs using other examples of Tensorflow, such as MNIST and CIFAR-10.
 
 POTENTIAL PROBLEMS
 
@@ -59,4 +56,4 @@ POTENTIAL PROBLEMS
 sudo pip install --upgrade /path/to/build/build.whl
 ```
 
-- The moving average variables, which are used track the batch mean and variance, are initialized by 0. If you have a decay very close to 1, it will take a while for them to approach the real mean and variance. Therefore, if you don't restore a pretrained model, set the decay to be around 0.7, run for several iterations, and then change it back to 0.99 or so.
+- The moving average variables, which are used trach the batch mean and variance, are initialized by 0. If you have a decay very close to 1, it will take a while for them to approach the real mean and variance. Therefore, if you don't restore a pretrained model, set the decay to be around 0.7, run for several iterations, and then change it back to 0.99 or so.

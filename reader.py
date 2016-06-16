@@ -1,29 +1,39 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 19 13:52:20 2016
-
-@author: sdemyanov
-"""
+#  Copyright 2016-present Sergey Demyanov. All Rights Reserved.
+#
+#  Contact: my_name@my_sirname.net
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# =============================================================================
 
 import tensorflow as tf
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import dtypes
-import cPickle as pickle
+import json
 import os
 import math
 #import functools
 
 import sys
-sys.path.append('./')
+sys.path.append('/home/sdemyanov/synapse/molemap')
 import utils.resize_image_patch
 reload(utils.resize_image_patch)
 
 class Reader(object):
 
-  LIST_DIR = './filelists'
-  FOLD_NAMES = {'train': 'train.dic',
-                'valid': 'valid.dic',
-                'test': 'test.dic'}
+  LIST_DIR = '/home/sdemyanov/synapse/molemap/tensorflow/filedicts'
+  FOLD_NAMES = {'train': 'train.json',
+                'valid': 'valid.json',
+                'test': 'test.json'}
 
   CLASSES_NUM = 15
   CHANNEL_NUM = 3
@@ -32,8 +42,8 @@ class Reader(object):
   MIN_INPUT_SIZE = 600
 
   SCALE_RATIO = 2.0
-  #ZOOM_RANGE = [1.1, 1.8]
-  #ZOOM_MEAN = (ZOOM_RANGE[0] + ZOOM_RANGE[0]) / 2
+  ZOOM_RANGE = [1.1, 1.8]
+  ZOOM_MEAN = (ZOOM_RANGE[0] + ZOOM_RANGE[0]) / 2
   SCALE_SIZE = 256
   SCALE_SIZE = 300
   #assert MIN_INPUT_SIZE / SCALE_RATIO / ZOOM_RANGE[1] >= SCALE_SIZE
@@ -54,20 +64,23 @@ class Reader(object):
     fold_path = os.path.join(Reader.LIST_DIR, Reader.FOLD_NAMES[fold_name])
     assert os.path.exists(fold_path)
     self._read_fold_list(fold_path)
-    self._get_filenames()
+    self._get_lists()
 
 
-  def _get_filenames(self):
+  def _get_lists(self):
+    self._image_list = []
+    self._label_list = []
     self._fname_list = []
-    for str in self._image_list:
-      self._fname_list.append(str.split('/')[-1])
+    for fpath, label in self._file_dict.items():
+      self._image_list.append(fpath)
+      self._label_list.append(label)
+      self._fname_list.append(fpath.split('/')[-1])
 
 
   def _read_fold_list(self, fold_path):
     with open(fold_path, 'rb') as handle:
-      (self._image_list, self._label_list) = pickle.load(handle)
-    assert len(self._image_list) == len(self._label_list)
-    self.fold_size = len(self._label_list)
+      self._file_dict = json.load(handle)
+    self.fold_size = len(self._file_dict)
 
 
   def _read_image_from_disk(self, input_queue):
@@ -200,6 +213,7 @@ class Reader(object):
       image = self._central_crop(image, Reader.IMAGE_SIZE)
       mean_contrast = math.sqrt(Reader.MIN_CONTRAST_FACTOR * Reader.MAX_CONTRAST_FACTOR)
       image = tf.image.adjust_contrast(image, mean_contrast)
+
       return image
 
 

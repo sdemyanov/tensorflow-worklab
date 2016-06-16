@@ -24,13 +24,13 @@ import math
 #import functools
 
 import sys
-sys.path.append('/home/sdemyanov/synapse/molemap')
+sys.path.append('./')
 import utils.resize_image_patch
 reload(utils.resize_image_patch)
 
 class Reader(object):
 
-  LIST_DIR = '/home/sdemyanov/synapse/molemap/tensorflow/filedicts'
+  LIST_DIR = './filedicts'
   FOLD_NAMES = {'train': 'train.json',
                 'valid': 'valid.json',
                 'test': 'test.json'}

@@ -140,7 +140,7 @@ class Network(object):
                           self._append(restscope, 'moving_mean'))
       self._set_restoring(ema.average(batch_var),
                           self._append(restscope, 'moving_variance'))
-      if (self.is_train and lr_mult > 0):
+      if (self.is_train):
         with tf.control_dependencies([ema_apply_op]):
           mean, var = tf.identity(batch_mean), tf.identity(batch_var)
       else:

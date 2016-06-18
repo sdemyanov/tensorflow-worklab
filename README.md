@@ -42,18 +42,18 @@ python /path/to/tensorflow/utils/inspect_checkpoint.py --file_name=/path/to/pret
 ```
 The inspect_checkpoint.py file can be found in 'tensorflow/python/tools' folder of the Tensorflow source, which you can download from GitHub.
 
-This script will show you the variable names, their types and sizes. Use the *restscope* parameter to specify mapping of these filenames to your model, defined in Network class. If you want to adjust the architecture (for example, change the last layer on another one with a different number of classes), define the parameter *restore=False* to specify that these variables need to be initialized from scratch and will not be restored.
+This script will show you the variable names, their types and sizes. Use the *restscope* parameter in the Network class to specify which the mapping from the external model variables to your own. Your variables without *restscope* will be either restored from the checkpoint, or initialized from scratch.
 
-Set up the path to the model to restore in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A model to restore is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, including those with the parameter 'restore=False'. Therefore, you can stop and start training at any time.
+Set up the path to the model to restore in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A model to restore is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, unless you specify *RESTORE_ANYWAY=True*. Therefore, you can stop and start training at any time.
 
 
 POTENTIAL PROBLEMS
 
-- First of all, adjust all the paths and other parameters to your own! Prepare file lists and their labels! The example is not supposed to be launched immediately.
+- First of all, adjust all the paths and other parameters to your own! Prepare the dictionary with file paths and their labels! The example is not supposed to be launched immediately.
 
 - In the current version (v0.8) of Tensorflow you cannot specify 1x1 convolutions with stride > 1, which are requred by ResNet models. To overcome this problem, install the latest nightly build. You can find it [here](ci.tensorflow.org/view/Nightly/job/nigntly-matrix-linux-gpu). Install it using
 ```
 sudo pip install --upgrade /path/to/build/build.whl
 ```
 
-- The moving average variables, which are used trach the batch mean and variance, are initialized by 0. If you have a decay very close to 1, it will take a while for them to approach the real mean and variance. Therefore, if you don't restore a pretrained model, set the decay to be around 0.7, run for several iterations, and then change it back to 0.99 or so.
+- The moving average variables, which are used trach the batch mean and variance, are initialized by 0. If you have a decay very close to 1, it will take a while for them to approach the real mean and variance. Therefore, if you don't restore a pretrained model, set the decay to be around 0.7, run for several iterations, and then change it to 0.99 or so.

@@ -1,17 +1,19 @@
-# Copyright 2015 Google Inc. All Rights Reserved.
+#  Copyright 2016-present Sergey Demyanov. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#  Contact: my_name@my_sirname.net
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# =============================================================================
 
 from __future__ import absolute_import
 from __future__ import division
@@ -39,7 +41,7 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = 'results'
+RESULTS_DIR = './current'
 PARAMS_FILE = 'params'
 
 EVAL_STEP_NUM = 50
@@ -54,7 +56,7 @@ LAST_STEP = STEP_VALUES[-1]
 
 def learning_rate(step):
   lr = LEARNING_RATE
-  for i in xrange(len(STEP_VALUES)):
+  for i in range(len(STEP_VALUES)):
     if (step > STEP_VALUES[i]):
       lr *= DECAY_FACTOR
     else:
@@ -63,11 +65,9 @@ def learning_rate(step):
 
 
 def main(argv=None):
-
-  results_dir = os.path.join(dname, RESULTS_DIR)
-  writer = Writer(results_dir)
-  trainer = Trainer(results_dir, 'train', writer)
-  tester = Tester(results_dir, 'valid', writer)
+  writer = Writer(RESULTS_DIR)
+  trainer = Trainer(RESULTS_DIR, 'train', writer)
+  tester = Tester(RESULTS_DIR, 'valid', writer)
 
   step, _ = tester.test(EVAL_STEP_NUM)
   while (step < LAST_STEP):

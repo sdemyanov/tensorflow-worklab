@@ -1,9 +1,19 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 26 14:57:34 2016
-
-@author: sdemyanov
-"""
+#  Copyright 2016-present Sergey Demyanov. All Rights Reserved.
+#
+#  Contact: my_name@my_sirname.net
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# =============================================================================
 
 import tensorflow as tf
 import os
@@ -12,8 +22,10 @@ class Session(object):
 
   GPU_SIZE = 12 #GB
   MODEL_NAME = 'model.ckpt'
-  #RESTORING_FILE = None
-  RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
+  RESTORING_FILE = None
+  RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
+  RESTORE_ANYWAY = False
+  #RESTORE_ANYWAY = True
 
   def __init__(self, graph, path, memory=None):
 
@@ -48,20 +60,20 @@ class Session(object):
     return None, 0
 
 
-  def _init_vars(self, initnames=None):
+  def _init_vars(self, init_names=None):
     with self._sess.graph.as_default():
-      if (initnames is None):
+      if (init_names is None):
         self.run(tf.initialize_all_variables())
       else:
-        self.run(tf.initialize_variables(initnames))
+        self.run(tf.initialize_variables(init_names))
 
 
-  def _restore_vars(self, model_file, restnames=None):
+  def _restore_vars(self, model_file, rest_names=None):
     with self._sess.graph.as_default():
-      if (restnames is None):
+      if (rest_names is None):
         restorer = tf.train.Saver(tf.all_variables())
       else:
-        restorer = tf.train.Saver(restnames)
+        restorer = tf.train.Saver(rest_names)
     restorer.restore(self._sess, model_file)
 
 
@@ -90,13 +102,15 @@ class Session(object):
       print('Restoring from saved model %s' %model_file)
       self._restore_vars(model_file)
     else:
-      if (Session.RESTORING_FILE is not None):
-        print('Restoring from external model %s' %Session.RESTORING_FILE)
-        self._restore_vars(Session.RESTORING_FILE, network.restnames)
-        self._init_vars(network.initnames)
-      else:
-        print('Initializing by random variables...')
-        self._init_vars()
+      print('Initializing by random variables...')
+      self._init_vars()
+
+    if (Session.RESTORING_FILE is not None and len(network.rest_names) > 0):
+      if (model_file is None or Session.RESTORE_ANYWAY):
+        print('WARNING: Restoring from external model %s' %Session.RESTORING_FILE)
+        #print(network.rest_names)
+        self._restore_vars(Session.RESTORING_FILE, network.rest_names)
+
     return step
 
 

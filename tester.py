@@ -1,9 +1,19 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May 19 14:48:48 2016
-
-@author: sdemyanov
-"""
+#  Copyright 2016-present Sergey Demyanov. All Rights Reserved.
+#
+#  Contact: my_name@my_sirname.net
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# =============================================================================
 
 import tensorflow as tf
 import numpy as np
@@ -11,7 +21,7 @@ import time
 import sys
 from datetime import datetime
 
-sys.path.append('./')
+sys.path.append('../')
 
 import utils.stats
 reload(utils.stats)
@@ -77,7 +87,7 @@ class Tester(object):
     begin = 0
     start_time = time.time()
 
-    for step in xrange(step_num):
+    for step in range(step_num):
       #print('%s: eval_iter=%d' %(datetime.now(), i))
       loss_batch, prob_batch, label_batch, filename_batch = session.run(
         [self._loss, self._probs, self._labels, self._filenames]
@@ -93,20 +103,29 @@ class Tester(object):
     sys.stdout.flush()
 
     loss_value /= step_num
-    print('%s: test_loss = %.2f' %(datetime.now(), loss_value))
+    #return loss_value, probs_values, labels_values
+    print('%s: test_loss = %.3f' %(datetime.now(), loss_value))
 
-    mult_acc = self.get_pred_stat(prob_values, label_values, filename_values)
+    mult_acc, bin_acc, auc, bin_sens = self.get_pred_stat(
+      prob_values, label_values, filename_values
+    )
     if (self.writer):
       summary_str = session.run(self._all_summaries)
       self.writer.write_summaries(summary_str, init_step)
       self.writer.write_scalars({'losses/testing/total_loss': loss_value,
-                                 'accuracy': mult_acc}, init_step)
-
+                                 'accuracy/multiclass': mult_acc,
+                                 'accuracy/binary': bin_acc,
+                                 'stats/AUC': auc,
+                                 'stats/sensitivity': bin_sens[0],
+                                 'stats/specificity': bin_sens[1]}, init_step)
     session.stop()
     return init_step, loss_value
 
 
   def get_pred_stat(self, prob, labels, filenames):
+
+    #groups_mic = utils.molemap.group_by_cases(prob, labels, filenames)
+    #(prob, labels) = utils.molemap.get_group_pred(groups_mic)
 
     confmat = utils.stats.get_pred_confmat(prob, labels)
     print('Total number of examples: %d' %np.sum(confmat))
@@ -121,4 +140,20 @@ class Tester(object):
     mult_accuracy = utils.stats.get_accuracy(confmat)
     print('Multiclass accuracy: %.1f%%' %(mult_accuracy*100))
 
-    return mult_accuracy
+    blocks = [3, 12]
+    binconf = utils.stats.get_block_confmat(confmat, blocks)
+    bin_sens = utils.stats.get_sensitivities(binconf)
+    print('Binary sensitivities:')
+    print(bin_sens*100)
+    print('F1-score: %f' %utils.stats.get_f1_score(binconf))
+    bin_max_accuracy = utils.stats.get_accuracy(binconf)
+    print('Binary max-accuracy: %.1f%%' %(bin_max_accuracy*100))
+
+    binpred = utils.stats.get_block_pred(prob, blocks)
+    binlab = utils.stats.get_block_labels(labels, blocks)
+    bin_sum_accuracy = utils.stats.get_pred_acc(binpred, binlab)
+    print('Binary sum-accuracy: %.1f%%' %(bin_sum_accuracy*100))
+    auc = utils.stats.get_auc_score(binpred[:,0], binlab)
+    print('AUC-score: %f' %auc)
+    #print ('')
+    return mult_accuracy, bin_sum_accuracy, auc, bin_sens

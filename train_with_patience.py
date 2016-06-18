@@ -1,17 +1,19 @@
-# Copyright 2015 Google Inc. All Rights Reserved.
+#  Copyright 2016-present Sergey Demyanov. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#  Contact: my_name@my_sirname.net
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
 #
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# =============================================================================
 
 from __future__ import absolute_import
 from __future__ import division
@@ -40,27 +42,25 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = 'results'
+RESULTS_DIR = './current'
 PARAMS_FILE = 'params'
 
-EVAL_STEP_NUM = 50
-DECAY_FACTOR = 0.1
-
 #CHANGE
-LEARNING_RATE = 0.001
-EVAL_FREQUENCY = 500
+LEARNING_RATE = 0.01
+EVAL_FREQUENCY = 600
+EVAL_STEP_NUM = 100
 PATIENCE = 3000
-MAX_DECAYS = 2
+MAX_DECAYS = 4
 
+DECAY_FACTOR = 0.1
 
 def main(argv=None):
 
-  results_dir = os.path.join(dname, RESULTS_DIR)
-  writer = Writer(results_dir)
-  trainer = Trainer(results_dir, 'train', writer)
-  tester = Tester(results_dir, 'valid', writer)
+  writer = Writer(RESULTS_DIR)
+  trainer = Trainer(RESULTS_DIR, 'train', writer)
+  tester = Tester(RESULTS_DIR, 'valid', writer)
 
-  params_file = os.path.join(results_dir, PARAMS_FILE)
+  params_file = os.path.join(RESULTS_DIR, PARAMS_FILE)
   if (os.path.isfile(params_file)):
     with open(params_file, 'r') as handle:
       params = json.load(handle)
@@ -101,8 +101,8 @@ def main(argv=None):
     with open(params_file, 'w') as handle:
       json.dump(params, handle)
 
-  print('min_test_loss: %.2f' %min_test_loss)
-  print('min_test_step: %.2f' %min_test_step)
+  print('min_test_loss: %.3f' %min_test_loss)
+  print('min_test_step: %d' %min_test_step)
   tester.test(step_num=None, init_step=min_test_step)
 
 

@@ -26,7 +26,6 @@ import math
 import sys
 sys.path.append('./')
 import utils.resize_image_patch
-reload(utils.resize_image_patch)
 
 class Reader(object):
 
@@ -35,25 +34,21 @@ class Reader(object):
                 'valid': 'valid.json',
                 'test': 'test.json'}
 
+  TRAINING_PREFIX = 'training'
+  TESTING_PREFIX = 'testing'
+
   CLASSES_NUM = 15
   CHANNEL_NUM = 3
   MEAN_CHANNEL_VALUES = [194, 161, 155]
   MAX_PIXEL_VALUE = 255
   MIN_INPUT_SIZE = 600
 
-  SCALE_RATIO = 2.0
-  ZOOM_RANGE = [1.1, 1.8]
-  ZOOM_MEAN = (ZOOM_RANGE[0] + ZOOM_RANGE[0]) / 2
-  SCALE_SIZE = 256
-  SCALE_SIZE = 300
-  #assert MIN_INPUT_SIZE / SCALE_RATIO / ZOOM_RANGE[1] >= SCALE_SIZE
-  CROP_SHAPE = (SCALE_SIZE, SCALE_SIZE, CHANNEL_NUM)
-  IMAGE_SIZE = 224
-
-  TRAINING_PREFIX = 'training'
-  TESTING_PREFIX = 'testing'
-
   #CHANGE
+  IMAGE_SIZE = 224
+  ZOOM_RANGE = [1.0, 1.4]
+  SHIFT_RATIO = 0.15
+  SCALE_SIZE = int(IMAGE_SIZE * (1 + 2 * SHIFT_RATIO))
+
   MIN_QUEUE_FRACTION = 0.1
   BRIGHTNESS_DELTA = 0.25
   MIN_CONTRAST_FACTOR = 0.5
@@ -88,7 +83,7 @@ class Reader(object):
       label = input_queue[1]
       filename = input_queue[2]
       file_contents = tf.read_file(input_queue[0])
-      image = tf.image.decode_jpeg(file_contents, ratio=Reader.SCALE_RATIO)
+      image = tf.image.decode_jpeg(file_contents, ratio=1.0)
       image = tf.cast(image, tf.float32)
       image.set_shape([None, None, None])
       return image, label, filename
@@ -151,7 +146,7 @@ class Reader(object):
 
       rotnum = tf.random_uniform(shape=[1], minval=0, maxval=4, dtype=tf.int32)
       rotind = tf.constant(0, dtype=tf.int32)
-      for i in xrange(4):
+      for i in range(4):
         image = tf.cond(tf.less(rotind, rotnum[0]), rotate, skip)
         rotind += 1
       return image
@@ -183,7 +178,7 @@ class Reader(object):
     return self._zoom_and_crop(image, size)
 
 
-  def _random_zoom_and_crop(self, image, zoom_range, size):
+  def _random_zoom_and_crop(self, image, size, zoom_range):
     with tf.variable_scope('random_zoom_and_crop'):
       zoom = tf.random_uniform(shape=[1], minval=zoom_range[0],
                                    maxval=zoom_range[1], dtype=tf.float32)
@@ -192,8 +187,8 @@ class Reader(object):
 
   def _train_transform(self, image):
     with tf.variable_scope('train_transform'):
-      #image = self._random_zoom_and_crop(image, Reader.ZOOM_RANGE, Reader.SCALE_SIZE)
-      image = self._scale_and_crop(image, Reader.SCALE_SIZE)
+      image = self._random_zoom_and_crop(image, Reader.SCALE_SIZE, Reader.ZOOM_RANGE)
+      #image = self._scale_and_crop(image, Reader.SCALE_SIZE)
       image_shape = (Reader.IMAGE_SIZE, Reader.IMAGE_SIZE, Reader.CHANNEL_NUM)
       image = tf.random_crop(image, image_shape)
       image = self._random_rotate90(image)
@@ -208,8 +203,9 @@ class Reader(object):
 
   def _test_transform(self, image):
     with tf.variable_scope('test_transform'):
-      #image = self._zoom_and_crop(image, Reader.SCALE_SIZE, Reader.ZOOM_MEAN)
-      image = self._scale_and_crop(image, Reader.SCALE_SIZE)
+      zoom_mean = (Reader.ZOOM_RANGE[0] + Reader.ZOOM_RANGE[0]) / 2
+      image = self._zoom_and_crop(image, Reader.SCALE_SIZE, zoom_mean)
+      #image = self._scale_and_crop(image, Reader.SCALE_SIZE)
       image = self._central_crop(image, Reader.IMAGE_SIZE)
       mean_contrast = math.sqrt(Reader.MIN_CONTRAST_FACTOR * Reader.MAX_CONTRAST_FACTOR)
       image = tf.image.adjust_contrast(image, mean_contrast)

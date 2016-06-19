@@ -119,7 +119,7 @@ class Trainer(object):
         if (self.writer):
           summary_str = session.run(self._all_summaries, feed_dict=feed_dict)
           self.writer.write_summaries(summary_str, step)
-          self.writer.write_scalars({'losses/training/total_loss': save_loss}, step)
+          self.writer.write_scalars({'losses/training/total_loss': train_loss}, step)
 
 
     session.stop()

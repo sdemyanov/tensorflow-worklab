@@ -42,9 +42,9 @@ python /path/to/tensorflow/utils/inspect_checkpoint.py --file_name=/path/to/pret
 ```
 The inspect_checkpoint.py file can be found in 'tensorflow/python/tools' folder of the Tensorflow source, which you can download from GitHub.
 
-This script will show you the variable names, their types and sizes. Use the *restscope* parameter in the Network class to specify which the mapping from the external model variables to your own. Your variables without *restscope* will be either restored from the checkpoint, or initialized from scratch.
+This script will show you the variable names, their types and sizes. Use the *restore* parameter in the Network class to specify the variable name in the external model. If you don't specify it (equivalent to *restore=True*), your own variable name will be used. Set *restore=False* to initialize the variable from scratch.
 
-Set up the path to the model to restore in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A model to restore is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, unless you specify *RESTORE_ANYWAY=True*. Therefore, you can stop and start training at any time.
+Set up the path to the restored model in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A restored model is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, unless you specify *RESTORE_ANYWAY=True*. Therefore, you can stop and start training at any time.
 
 
 POTENTIAL PROBLEMS

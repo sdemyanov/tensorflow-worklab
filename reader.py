@@ -24,12 +24,12 @@ import math
 #import functools
 
 import sys
-sys.path.append('./')
+sys.path.append('../')
 import utils.resize_image_patch
 
 class Reader(object):
 
-  LIST_DIR = './filedicts'
+  DICTS_DIR = './filedicts'
   FOLD_NAMES = {'train': 'train.json',
                 'valid': 'valid.json',
                 'test': 'test.json'}
@@ -56,20 +56,10 @@ class Reader(object):
 
 
   def __init__(self, fold_name):
-    fold_path = os.path.join(Reader.LIST_DIR, Reader.FOLD_NAMES[fold_name])
+    fold_path = os.path.join(Reader.DICTS_DIR, Reader.FOLD_NAMES[fold_name])
     assert os.path.exists(fold_path)
     self._read_fold_list(fold_path)
     self._get_lists()
-
-
-  def _get_lists(self):
-    self._image_list = []
-    self._label_list = []
-    self._fname_list = []
-    for fpath, label in self._file_dict.items():
-      self._image_list.append(fpath)
-      self._label_list.append(label)
-      self._fname_list.append(fpath.split('/')[-1])
 
 
   def _read_fold_list(self, fold_path):
@@ -78,54 +68,14 @@ class Reader(object):
     self.fold_size = len(self._file_dict)
 
 
-  def _read_image_from_disk(self, input_queue):
-    with tf.variable_scope('reading'):
-      label = input_queue[1]
-      filename = input_queue[2]
-      file_contents = tf.read_file(input_queue[0])
-      image = tf.image.decode_jpeg(file_contents, ratio=1.0)
-      image = tf.cast(image, tf.float32)
-      image.set_shape([None, None, None])
-      return image, label, filename
-
-
-  def _generate_image_and_label_batch(self, image, label, filename,
-                                      batch_size, min_queue_examples, shuffle):
-    """Construct a queued batch of images and labels.
-
-    Args:
-      image: 3-D Tensor of [height, width, 3] of type.float32.
-      label: 1-D Tensor of type.int32
-      min_queue_examples: int32, minimum number of samples to retain
-        in the queue that provides of batches of examples.
-      batch_size: Number of images per batch.
-      shuffle: boolean indicating whether to use a shuffling queue.
-
-    Returns:
-      images: Images. 4D tensor of [batch_size, height, width, 3] size.
-      labels: Labels. 1D tensor of [batch_size] size.
-    """
-    # Create a queue that shuffles the examples, and then
-    # read 'batch_size' images + labels from the example queue.
-    num_preprocess_threads = 16
-    if (shuffle):
-      images, labels, filenames = tf.train.shuffle_batch(
-        [image, label, filename],
-        batch_size=batch_size,
-        num_threads=num_preprocess_threads,
-        capacity=min_queue_examples + 3 * batch_size,
-        min_after_dequeue=min_queue_examples,
-        name='0/training'
-      )
-    else:
-      images, labels, filenames = tf.train.batch(
-        [image, label, filename],
-        batch_size=batch_size,
-        num_threads=num_preprocess_threads,
-        capacity=min_queue_examples + 3 * batch_size,
-        name='0/testing'
-      )
-    return images, labels, filenames
+  def _get_lists(self):
+    self._image_list = []
+    self._fname_list = []
+    self._label_list = []
+    for fpath, label in self._file_dict.items():
+      self._image_list.append(fpath)
+      self._fname_list.append(fpath.split('/')[-1])
+      self._label_list.append(label)
 
 
   def _rotate90(self, image):
@@ -209,11 +159,44 @@ class Reader(object):
       image = self._central_crop(image, Reader.IMAGE_SIZE)
       mean_contrast = math.sqrt(Reader.MIN_CONTRAST_FACTOR * Reader.MAX_CONTRAST_FACTOR)
       image = tf.image.adjust_contrast(image, mean_contrast)
-
       return image
 
 
-  def inputs(self, batch_size, is_train):
+  def _read_image_from_disk(self, input_queue):
+    with tf.variable_scope('reading'):
+      file_contents = tf.read_file(input_queue[0])
+      label = input_queue[1]
+      filename = input_queue[2]
+      image = tf.image.decode_jpeg(file_contents, ratio=1.0)
+      image = tf.cast(image, tf.float32)
+      image.set_shape([None, None, None])
+      return image, label, filename
+
+
+  def _generate_image_and_label_batch(self, image, label, filename,
+                                      batch_size, min_queue_examples, shuffle):
+    num_preprocess_threads = 16
+    if (shuffle):
+      images, labels, filenames = tf.train.shuffle_batch(
+        [image, label, filename],
+        batch_size=batch_size,
+        num_threads=num_preprocess_threads,
+        capacity=min_queue_examples + 3 * batch_size,
+        min_after_dequeue=min_queue_examples,
+        name='0/training'
+      )
+    else:
+      images, labels, filenames = tf.train.batch(
+        [image, label, filename],
+        batch_size=batch_size,
+        num_threads=num_preprocess_threads,
+        capacity=min_queue_examples + 3 * batch_size,
+        name='0/testing'
+      )
+    return images, labels, filenames
+
+
+def inputs(self, batch_size, is_train):
 
     with tf.variable_scope('inputs'):
       image_op = ops.convert_to_tensor(self._image_list, dtype=dtypes.string)
@@ -250,7 +233,7 @@ class Reader(object):
         prefix = Reader.TESTING_PREFIX
       # images are too heavy for summary, but uncomment for check if needed
       #tf.image_summary(prefix, images, max_images=batch_size)
-      tf.histogram_summary(prefix + 'image_values', images)
-      tf.histogram_summary(prefix + 'labels', labels)
+      tf.histogram_summary(prefix + '/image_values', images)
+      tf.histogram_summary(prefix + '/labels', labels)
 
       return images, labels, filenames

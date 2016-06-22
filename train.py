@@ -37,15 +37,19 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = './current'
+RESULTS_DIR = './results'
+#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
+RESTORING_FILE = None
 
 EVAL_FREQUENCY = 100
-LEARNING_RATE = 0.01
+
+#Launched just to update batch moving averages
+LEARNING_RATE = 0
 
 def main(argv=None):
   writer = Writer(RESULTS_DIR)
   trainer = Trainer(RESULTS_DIR, 'train', writer)
-  trainer.train(LEARNING_RATE, EVAL_FREQUENCY)
+  trainer.train(LEARNING_RATE, EVAL_FREQUENCY, init_step=None, restoring_file=RESTORING_FILE)
 
 
 if __name__ == '__main__':

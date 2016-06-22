@@ -41,10 +41,11 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = './current'
-PARAMS_FILE = 'params'
+RESULTS_DIR = './results'
+#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
+RESTORING_FILE = None
 
-EVAL_STEP_NUM = 50
+EVAL_STEP_NUM = 100
 DECAY_FACTOR = 0.1
 
 #CHANGE
@@ -72,7 +73,7 @@ def main(argv=None):
   step, _ = tester.test(EVAL_STEP_NUM)
   while (step < LAST_STEP):
     lr = learning_rate(step)
-    step, _ = trainer.train(lr, EVAL_FREQUENCY, step)
+    step, _ = trainer.train(lr, EVAL_FREQUENCY, step, RESTORING_FILE)
     tester.test(EVAL_STEP_NUM, step)
 
 

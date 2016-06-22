@@ -37,8 +37,8 @@ from tester import Tester
 #reload(writer)
 #from writer import Writer
 
-RESULTS_DIR = './current'
-EVAL_STEP_NUM = 10
+RESULTS_DIR = './results'
+EVAL_STEP_NUM = 100
 
 def main(argv=None):  # pylint: disable=unused-argument
   #writer = Writer(RESULTS_DIR)

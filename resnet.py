@@ -23,7 +23,7 @@ from reader import Reader
 
 class Network(object):
 
-  TRAIN_DECAY = 0.7    # The decay to use for the moving average.
+  TRAIN_DECAY = 0.99    # The decay to use for the moving average.
   STDDEV = 1e-4
   BN_EPS = 1e-5
 
@@ -32,7 +32,7 @@ class Network(object):
   TRAINING_PREFIX = 'training'
   TESTING_PREFIX = 'testing'
 
-  def __init__(self, input, is_train):
+  def __init__(self, images, is_train, hyper=None):
     self.is_train = is_train
     self._decay = Network.TRAIN_DECAY
     if (is_train):
@@ -41,7 +41,8 @@ class Network(object):
       self._prefix = Network.TESTING_PREFIX
     self.lr_multipliers = {}
     self.rest_names = {}
-    self._output = self._construct(input)
+    self._output = self._construct(images, hyper)
+
 
 
   def dims(self, output, dim=None):
@@ -53,7 +54,10 @@ class Network(object):
 
   def _output_elem(self, output):
     dims = self.dims(output)
-    return dims[1] * dims[2] * dims[3]
+    elem = 1
+    for i in range(1, len(dims)):
+      elem *= dims[i]
+    return elem
 
 
   def _append(self, restore, appendix):
@@ -76,8 +80,8 @@ class Network(object):
     if (restore == False):
       return
     if (restore == True):
-      restname = var.op.name
-    self.rest_names[restname] = var
+      restore = var.op.name
+    self.rest_names[restore] = var
     #print("%s: %s" %(var.op.name, restore))
 
 
@@ -144,7 +148,7 @@ class Network(object):
                           self._append(restore, 'moving_mean'))
       self._set_restoring(ema.average(batch_var),
                           self._append(restore, 'moving_variance'))
-      if (self.is_train):
+      if (self.is_train): # and lr_mult > 0):
         with tf.control_dependencies([ema_apply_op]):
           mean, var = tf.identity(batch_mean), tf.identity(batch_var)
       else:
@@ -227,16 +231,15 @@ class Network(object):
       return output
 
 
-  def _full_block(self, output, output_maps,
-                  weight_decay=0.0, lr_mult=1.0,
-                  scope='full_block', restore=True):
+  def _conv_block_new(self, output, output_maps,
+                      filter_size=3, stride=1,
+                      weight_decay=0.0, lr_mult=1.0,
+                      scope='conv_block_new', restore=True):
     with tf.variable_scope(scope):
-      output = self._full_layer(output, output_maps,
-                                weight_decay, lr_mult,
-                                restore=restore)
-      output = self._batch_norm(output, lr_mult,
-                                restore=restore)
+      output = self._batch_norm(output, lr_mult, restore=restore)
       output = self._nonlinearity(output)
+      output = self._conv_layer(output, output_maps, filter_size, stride,
+                                weight_decay, lr_mult, restore=restore)
       self._activation_summary(output)
       return output
 
@@ -271,11 +274,50 @@ class Network(object):
       return output
 
 
+  def _resn_block_new(self, output, inside_maps,
+                      output_maps=None, stride=1,
+                      weight_decay=0.0, lr_mult=1.0,
+                      scope='resn_block_new', restore=True):
+    with tf.variable_scope(scope):
+      input = output
+      input_maps = self.dims(output, 3)
+      if not output_maps:
+        output_maps = input_maps
+      output = self._conv_block_new(output, inside_maps, 1, stride,
+                                weight_decay, lr_mult, scope='in', restore=restore)
+      output = self._conv_block_new(output, inside_maps, 3, 1,
+                                weight_decay, lr_mult, scope='middle', restore=restore)
+      output = self._conv_block_new(output, output_maps, 1, 1,
+                                weight_decay, lr_mult, scope='out', restore=restore)
+      if (output_maps != input_maps or stride != 1):
+        with tf.variable_scope('projection'):
+          input = self._conv_block_new(input, output_maps, 1, stride,
+                                       weight_decay, lr_mult, restore=restore)
+      output += input
+      self._activation_summary(output)
+      return output
+
+
+  def _full_block(self, output, output_maps,
+                  weight_decay=0.0, lr_mult=1.0,
+                  scope='full_block', restore=True):
+    with tf.variable_scope(scope):
+      output = self._full_layer(output, output_maps,
+                                weight_decay, lr_mult, restore=restore)
+      output = self._batch_norm(output, lr_mult, restore=restore)
+      output = self._nonlinearity(output)
+      self._activation_summary(output)
+      return output
+
+
   def _last_block(self, output,
                   weight_decay=0.0, lr_mult=1.0,
                   scope='last_block', restore=True):
     with tf.variable_scope(scope):
-      # First do pooling to size 1x1
+      # First we apply preactivation as the resn_block_new does not do it for the output
+      output = self._batch_norm(output, lr_mult, restore=restore)
+      output = self._nonlinearity(output)
+      # Then we do pooling to size 1x1
       input_dims = self.dims(output)
       # make sure that the input is squared
       assert input_dims[1] == input_dims[2]
@@ -284,8 +326,7 @@ class Network(object):
         output = self._pool_layer(output, filter_size=map_size,
                                   stride=map_size, func='avg')
       output = self._full_layer(output, Reader.CLASSES_NUM,
-                                weight_decay, lr_mult,
-                                restore=restore)
+                                weight_decay, lr_mult, restore=restore)
       # No batch_norm in resnet for the fc-layer
       #output = self._batch_norm(output, lr_mult, restore=restore)
 
@@ -294,52 +335,54 @@ class Network(object):
       return output
 
 
-  def _construct(self, output):
+  def _construct(self, output, hyper=None):
     #with tf.variable_scope('0'):
     #  output = self._batch_norm(output=False)
 
     with tf.variable_scope('1'):
       output = self._conv_block(output, output_maps=64,
                                 filter_size=7, stride=2, lr_mult=0.0,
-                                scope='conv_block', restore='scale1')
+                                scope='conv_block')#, restore='scale1')
 
     with tf.variable_scope('2'):
       output = self._pool_layer(output)
-      for i in range(0, 3):
+      for i in range(1, 4):
         output = self._resn_block(output, inside_maps=64,
                                   output_maps=256, stride=1, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale2/block'+str(i+1))
+                                  scope=str(i))#, restore='scale2/block'+str(i))
 
     with tf.variable_scope('3'):
       output = self._resn_block(output, inside_maps=128,
                                 output_maps=512, stride=2, lr_mult=0.0,
-                                scope='1', restore='scale3/block1')
-      for i in range(1, 4):
+                                scope='1')#, restore='scale3/block1')
+      for i in range(2, 5):
         output = self._resn_block(output, inside_maps=128, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale3/block'+str(i+1))
+                                  scope=str(i))#, restore='scale3/block'+str(i))
 
     with tf.variable_scope('4'):
       output = self._resn_block(output, inside_maps=256,
                                 output_maps=1024, stride=2, lr_mult=0.0,
-                                scope='1', restore='scale4/block1')
-      for i in range(1, 10):
+                                scope='1')#, restore='scale4/block1')
+      for i in range(2, 11):
         output = self._resn_block(output, inside_maps=256, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale4/block'+str(i+1))
-      for i in range(10, 23):
-        output = self._resn_block(output, inside_maps=256, lr_mult=1.0,
-                                  scope=str(i+1), restore='scale4/block'+str(i+1))
+                                  scope=str(i))#, restore='scale4/block'+str(i))
+      for i in range(11, hyper-1):
+        output = self._resn_block_new(output, inside_maps=256, lr_mult=1.0,
+                                  scope=str(i))#, restore='scale4/block'+str(i))
+      for i in range(hyper-1, hyper+1):
+        output = self._resn_block_new(output, inside_maps=256, lr_mult=1.0,
+                                      scope=str(i), restore=False)  # , restore='scale4/block'+str(i))
 
     with tf.variable_scope('5'):
-      output = self._resn_block(output, inside_maps=512,
+      output = self._resn_block_new(output, inside_maps=512,
                                 output_maps=2048, stride=2, lr_mult=1.0,
-                                scope='1', restore='scale5/block1')
-      for i in range(1, 3):
-        output = self._resn_block(output, inside_maps=512, lr_mult=1.0,
-                                  scope=str(i+1), restore='scale5/block'+str(i+1))
+                                scope='1', restore=True)# restore='scale5/block1')
+      for i in range(2, 4):
+        output = self._resn_block_new(output, inside_maps=512, lr_mult=1.0,
+                                  scope=str(i), restore=True)#, restore='scale5/block'+str(i))
 
     with tf.variable_scope('6'):
-      output = self._last_block(output, lr_mult=1.0,
-                                scope='last_block', restore=False)
+      output = self._last_block(output, lr_mult=1.0, scope='last_block', restore=True)
 
     return output
 

@@ -42,15 +42,17 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = './current'
-PARAMS_FILE = 'params'
+RESULTS_DIR = './results'
+PARAMS_FILE = 'params.json'
+#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
+RESTORING_FILE = None
 
 #CHANGE
-LEARNING_RATE = 0.01
-EVAL_FREQUENCY = 600
+LEARNING_RATE = 0.001
+EVAL_FREQUENCY = 500
 EVAL_STEP_NUM = 100
-PATIENCE = 3000
-MAX_DECAYS = 4
+PATIENCE = 5000
+MAX_DECAYS = 3
 
 DECAY_FACTOR = 0.1
 
@@ -64,46 +66,35 @@ def main(argv=None):
   if (os.path.isfile(params_file)):
     with open(params_file, 'r') as handle:
       params = json.load(handle)
-    min_test_loss = params['min_test_loss']
-    min_test_step = params['min_test_step']
-    unchanged = params['unchanged']
-    num_decays = params['num_decays']
-    step = params['step']
-    learning_rate = params['learning_rate']
   else:
-    min_test_step, min_test_loss = tester.test(EVAL_STEP_NUM)
-    unchanged = 0
-    num_decays = 0
-    step = min_test_step
-    learning_rate = LEARNING_RATE
+    params = {}
+    params['min_test_step'], params['min_test_loss'] = tester.test(EVAL_STEP_NUM)
+    params['step'] = params['min_test_step']
+    params['unchanged'] = 0
+    params['num_decays'] = 0
+    params['learning_rate'] = LEARNING_RATE
 
-  while (num_decays <= MAX_DECAYS):
-    step, _ = trainer.train(learning_rate, EVAL_FREQUENCY, step)
-    _, test_loss = tester.test(EVAL_STEP_NUM, step)
-    if (test_loss < min_test_loss):
-      min_test_loss = test_loss
-      min_test_step = step
-      unchanged = 0
+  while (params['num_decays'] <= MAX_DECAYS):
+    params['step'], _ = trainer.train(params['learning_rate'], EVAL_FREQUENCY,
+                                      params['step'], RESTORING_FILE)
+    _, test_loss = tester.test(EVAL_STEP_NUM, params['step'])
+    if (test_loss < params['min_test_loss']):
+      params['min_test_loss'] = test_loss
+      params['min_test_step'] = params['step']
+      params['unchanged'] = 0
     else:
-      unchanged += EVAL_FREQUENCY
-      if (unchanged >= PATIENCE):
-        learning_rate *= DECAY_FACTOR
-        num_decays += 1
-        step = min_test_step
-        unchanged = 0
+      params['unchanged'] += EVAL_FREQUENCY
+      if (params['unchanged'] >= PATIENCE):
+        params['learning_rate'] *= DECAY_FACTOR
+        params['num_decays'] += 1
+        params['step'] = params['min_test_step']
+        params['unchanged'] = 0
 
-    params = {'min_test_loss': min_test_loss,
-              'min_test_step': min_test_step,
-              'unchanged': unchanged,
-              'num_decays': num_decays,
-              'step': step,
-              'learning_rate': learning_rate}
     with open(params_file, 'w') as handle:
-      json.dump(params, handle)
+      json.dump(params, handle, indent=2)
+    print(params)
 
-  print('min_test_loss: %.3f' %min_test_loss)
-  print('min_test_step: %d' %min_test_step)
-  tester.test(step_num=None, init_step=min_test_step)
+  #tester.test(step_num=None, init_step=params['min_test_step'])
 
 
 if __name__ == '__main__':

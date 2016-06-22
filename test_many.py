@@ -38,10 +38,10 @@ import writer
 reload(writer)
 from writer import Writer
 
-RESULTS_DIR = './current'
+RESULTS_DIR = './results'
 
 INTERVAL = 3
-EVAL_STEP_NUM = 50
+EVAL_STEP_NUM = 100
 
 def main(argv=None):
   writer = Writer(RESULTS_DIR)

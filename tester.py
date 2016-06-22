@@ -17,6 +17,7 @@
 
 import tensorflow as tf
 import numpy as np
+import os
 import time
 import sys
 from datetime import datetime
@@ -45,32 +46,31 @@ class Tester(object):
 
   BATCH_SIZE = 32
 
-  def __init__(self, models_dir, fold_name, writer=None):
+  def __init__(self, models_dir, fold_name, writer=None, hyper=None):
     self._graph = tf.Graph()
     with self._graph.as_default():
       reader = Reader(fold_name)
       self.fold_size = reader.fold_size
-      with tf.device('/gpu:0'):
-        images, self._labels, self._filenames = reader.inputs(Tester.BATCH_SIZE,
-                                                              is_train=False)
-        self._network = Network(images, is_train=False)
+      with tf.device('/gpu:1'):
+        images, self._labels, scores, self._filenames = reader.inputs(Tester.BATCH_SIZE, is_train=False)
+        self._network = Network(images, is_train=False, hyper=hyper, features=scores)
         self._probs = self._network.probs()
         self._loss = self._network.loss(self._labels)
         self._all_summaries = tf.merge_all_summaries()
 
     self.models_dir = models_dir
     print('Tester model folder: %s' %self.models_dir)
-    assert(tf.gfile.Exists(self.models_dir))
+    assert os.path.exists(self.models_dir)
 
     self.writer = writer
 
 
-  def test(self, step_num=None, init_step=None):
+  def test(self, step_num=None, init_step=None, restoring_file=None):
     print('%s: testing...' %datetime.now())
     sys.stdout.flush()
 
     session = Session(self._graph, self.models_dir)
-    init_step = session.init(self._network, init_step)
+    init_step = session.init(self._network, init_step, restoring_file)
     session.start()
 
     if (init_step == 0):
@@ -123,9 +123,6 @@ class Tester(object):
 
 
   def get_pred_stat(self, prob, labels, filenames):
-
-    #groups_mic = utils.molemap.group_by_cases(prob, labels, filenames)
-    #(prob, labels) = utils.molemap.get_group_pred(groups_mic)
 
     confmat = utils.stats.get_pred_confmat(prob, labels)
     print('Total number of examples: %d' %np.sum(confmat))

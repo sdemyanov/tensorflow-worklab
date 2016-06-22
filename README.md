@@ -31,6 +31,8 @@ The following scripts are created for launching:
 
 - **train_with_patience** - sequentially runs training and testing operations, and drops the learning rate when the test loss stops decreasing.
 
+- **train_with_hyper** - sequentially runs *train_with_patience* for each value of hyperparameter until the test loss stops decreasing. Hyperparameter is passed to the Network class, and can be used to tune one parameter the network architecture, such as width or depth.
+
 
 HOW TO RETRAIN A MODEL
 
@@ -38,13 +40,13 @@ In the Network class you specify your model. You start from defining the primiti
 
 Scopes are used to define the variable names, and visualize the graph in Tensorboard. Adjust them for your purpose. In order to find the variable names of an existing model, use the command
 ```
-python /path/to/tensorflow/utils/inspect_checkpoint.py --file_name=/path/to/pretrained_model/model.ckpt
+python /path/to/tensorflow/tensorflow/python/tools/inspect_checkpoint.py --file_name=/path/to/pretrained_model/model.ckpt
 ```
-The inspect_checkpoint.py file can be found in 'tensorflow/python/tools' folder of the Tensorflow source, which you can download from GitHub.
+The inspect_checkpoint.py file can be found in './tensorflow/python/tools' folder of the Tensorflow source, which you can download from GitHub.
 
 This script will show you the variable names, their types and sizes. Use the *restore* parameter in the Network class to specify the variable name in the external model. If you don't specify it (equivalent to *restore=True*), your own variable name will be used. Set *restore=False* to initialize the variable from scratch.
 
-Set up the path to the restored model in Session class. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A restored model is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, unless you specify *RESTORE_ANYWAY=True*. Therefore, you can stop and start training at any time.
+Set up the path to the restored model in the training script. For example, use [this link](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent) to download pretrained ResNet models. *A restored model is used only at the start of training*. Once the current session is saved (i.e. the checkpoint file exist), all variables are restored from it, unless you specify *RESTORE_ANYWAY=True* in the Session class. Therefore, you can stop and start training at any time.
 
 
 POTENTIAL PROBLEMS

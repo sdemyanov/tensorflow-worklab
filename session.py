@@ -22,8 +22,6 @@ class Session(object):
 
   GPU_SIZE = 12 #GB
   MODEL_NAME = 'model.ckpt'
-  RESTORING_FILE = None
-  RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
   RESTORE_ANYWAY = False
   #RESTORE_ANYWAY = True
 
@@ -83,7 +81,7 @@ class Session(object):
     print('Saving model to %s, step=%d' %(model_file, step))
 
 
-  def init(self, network, step=None):
+  def init(self, network, step=None, restoring_file=None):
     # use step=None to init from the last model, if there is any
     # use step=0 to init from a restoring model, or to init from scratch
     # use step>0 to init from a particular savel model
@@ -105,11 +103,11 @@ class Session(object):
       print('Initializing by random variables...')
       self._init_vars()
 
-    if (Session.RESTORING_FILE is not None and len(network.rest_names) > 0):
+    if (restoring_file is not None and len(network.rest_names) > 0):
       if (model_file is None or Session.RESTORE_ANYWAY):
-        print('WARNING: Restoring from external model %s' %Session.RESTORING_FILE)
+        print('WARNING: Restoring from external model %s' %restoring_file)
         #print(network.rest_names)
-        self._restore_vars(Session.RESTORING_FILE, network.rest_names)
+        self._restore_vars(restoring_file, network.rest_names)
 
     return step
 

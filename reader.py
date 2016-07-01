@@ -29,8 +29,7 @@ import utils.resize_image_patch
 
 class Reader(object):
 
-  #DICTS_DIR = './filedicts'
-  DICTS_DIR = '/data/mma/skin/molemap/filedicts'
+  DICTS_DIR = './filedicts'
 
   TRAINING_PREFIX = 'training'
   TESTING_PREFIX = 'testing'

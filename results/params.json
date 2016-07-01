@@ -1,8 +1,0 @@
-{
-  "min_test_loss": 2.7080655097961426, 
-  "min_test_step": 0, 
-  "learning_rate": 0.01, 
-  "num_decays": 0, 
-  "step": 50, 
-  "unchanged": 1
-}

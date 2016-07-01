@@ -46,8 +46,7 @@ from writer import Writer
 RESULTS_DIR = './results'
 PARAMS_FILE = 'params.json'
 RESTORING_FILE = None
-#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
-RESTORING_FILE = '/data/mma/skin/molemap/resnet-pretrained/ResNet-L50.ckpt'
+RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
 
 #CHANGE
 LEARNING_RATE = 0.01

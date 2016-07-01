@@ -342,47 +342,47 @@ class Network(object):
     with tf.variable_scope('1'):
       output = self._conv_block(output, output_maps=64,
                                 filter_size=7, stride=2, lr_mult=0.0,
-                                scope='conv_block')#, restore='scale1')
+                                scope='conv_block', restore='scale1')
 
     with tf.variable_scope('2'):
       output = self._pool_layer(output)
       for i in range(1, 4):
         output = self._resn_block(output, inside_maps=64,
                                   output_maps=256, stride=1, lr_mult=0.0,
-                                  scope=str(i))#, restore='scale2/block'+str(i))
+                                  scope=str(i), restore='scale2/block'+str(i))
 
     with tf.variable_scope('3'):
       output = self._resn_block(output, inside_maps=128,
                                 output_maps=512, stride=2, lr_mult=0.0,
-                                scope='1')#, restore='scale3/block1')
+                                scope='1', restore='scale3/block1')
       for i in range(2, 5):
         output = self._resn_block(output, inside_maps=128, lr_mult=0.0,
-                                  scope=str(i))#, restore='scale3/block'+str(i))
+                                  scope=str(i), restore='scale3/block'+str(i))
 
     with tf.variable_scope('4'):
       output = self._resn_block(output, inside_maps=256,
                                 output_maps=1024, stride=2, lr_mult=0.0,
-                                scope='1')#, restore='scale4/block1')
+                                scope='1', restore='scale4/block1')
       for i in range(2, 11):
         output = self._resn_block(output, inside_maps=256, lr_mult=0.0,
-                                  scope=str(i))#, restore='scale4/block'+str(i))
+                                  scope=str(i), restore='scale4/block'+str(i))
       for i in range(11, hyper-1):
         output = self._resn_block_new(output, inside_maps=256, lr_mult=1.0,
-                                  scope=str(i))#, restore='scale4/block'+str(i))
+                                  scope=str(i), restore='scale4/block'+str(i))
       for i in range(hyper-1, hyper+1):
         output = self._resn_block_new(output, inside_maps=256, lr_mult=1.0,
-                                      scope=str(i), restore=False)  # , restore='scale4/block'+str(i))
+                                      scope=str(i), restore='scale4/block'+str(i))
 
     with tf.variable_scope('5'):
       output = self._resn_block_new(output, inside_maps=512,
                                 output_maps=2048, stride=2, lr_mult=1.0,
-                                scope='1', restore=True)# restore='scale5/block1')
+                                scope='1', restore='scale5/block1')
       for i in range(2, 4):
         output = self._resn_block_new(output, inside_maps=512, lr_mult=1.0,
-                                  scope=str(i), restore=True)#, restore='scale5/block'+str(i))
+                                  scope=str(i), restore='scale5/block'+str(i))
 
     with tf.variable_scope('6'):
-      output = self._last_block(output, lr_mult=1.0, scope='last_block', restore=True)
+      output = self._last_block(output, lr_mult=1.0, scope='last_block', restore=False)
 
     return output
 

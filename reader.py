@@ -29,10 +29,8 @@ import utils.resize_image_patch
 
 class Reader(object):
 
-  DICTS_DIR = './filedicts'
-  FOLD_NAMES = {'train': 'train.json',
-                'valid': 'valid.json',
-                'test': 'test.json'}
+  #DICTS_DIR = './filedicts'
+  DICTS_DIR = '/data/mma/skin/molemap/filedicts'
 
   TRAINING_PREFIX = 'training'
   TESTING_PREFIX = 'testing'
@@ -56,26 +54,25 @@ class Reader(object):
 
 
   def __init__(self, fold_name):
-    fold_path = os.path.join(Reader.DICTS_DIR, Reader.FOLD_NAMES[fold_name])
+    fold_path = os.path.join(Reader.DICTS_DIR, fold_name + '.json')
     assert os.path.exists(fold_path)
     self._read_fold_list(fold_path)
     self._get_lists()
 
 
   def _read_fold_list(self, fold_path):
-    with open(fold_path, 'rb') as handle:
+    with open(fold_path, 'r') as handle:
       self._file_dict = json.load(handle)
     self.fold_size = len(self._file_dict)
 
 
   def _get_lists(self):
-    self._image_list = []
-    self._fname_list = []
-    self._label_list = []
-    for fpath, label in self._file_dict.items():
-      self._image_list.append(fpath)
-      self._fname_list.append(fpath.split('/')[-1])
-      self._label_list.append(label)
+    self._lists = {}
+    self._lists['images'] = []
+    self._lists['labels'] = []
+    for fpath, info in self._file_dict.items():
+      self._lists['images'].append(fpath) # images
+      self._lists['labels'].append(info)  # labels
 
 
   def _rotate90(self, image):
@@ -87,17 +84,10 @@ class Reader(object):
 
   def _random_rotate90(self, image):
     with tf.variable_scope('random_rotate90'):
-
-      def rotate():
-        return self._rotate90(image)
-
-      def skip():
-        return image
-
       rotnum = tf.random_uniform(shape=[1], minval=0, maxval=4, dtype=tf.int32)
       rotind = tf.constant(0, dtype=tf.int32)
       for i in range(4):
-        image = tf.cond(tf.less(rotind, rotnum[0]), rotate, skip)
+        image = tf.cond(tf.less(rotind, rotnum[0]), lambda: self._rotate90(image), lambda: image)
         rotind += 1
       return image
 
@@ -162,23 +152,11 @@ class Reader(object):
       return image
 
 
-  def _read_image_from_disk(self, input_queue):
-    with tf.variable_scope('reading'):
-      file_contents = tf.read_file(input_queue[0])
-      label = input_queue[1]
-      filename = input_queue[2]
-      image = tf.image.decode_jpeg(file_contents, ratio=1.0)
-      image = tf.cast(image, tf.float32)
-      image.set_shape([None, None, None])
-      return image, label, filename
-
-
-  def _generate_image_and_label_batch(self, image, label, filename,
-                                      batch_size, min_queue_examples, shuffle):
+  def _generate_batches(self, tensors, batch_size, min_queue_examples, shuffle):
     num_preprocess_threads = 16
     if (shuffle):
-      images, labels, filenames = tf.train.shuffle_batch(
-        [image, label, filename],
+      return tf.train.shuffle_batch(
+        tensors,
         batch_size=batch_size,
         num_threads=num_preprocess_threads,
         capacity=min_queue_examples + 3 * batch_size,
@@ -186,46 +164,55 @@ class Reader(object):
         name='0/training'
       )
     else:
-      images, labels, filenames = tf.train.batch(
-        [image, label, filename],
+      return tf.train.batch(
+        tensors,
         batch_size=batch_size,
         num_threads=num_preprocess_threads,
         capacity=min_queue_examples + 3 * batch_size,
         name='0/testing'
       )
-    return images, labels, filenames
 
 
-def inputs(self, batch_size, is_train):
-
+  def inputs(self, batch_size, is_train):
     with tf.variable_scope('inputs'):
-      image_op = ops.convert_to_tensor(self._image_list, dtype=dtypes.string)
-      label_op = ops.convert_to_tensor(self._label_list, dtype=dtypes.int64)
-      fname_op = ops.convert_to_tensor(self._fname_list, dtype=dtypes.string)
+      keys = []
+      operations = []
+      for key, list in self._lists.items():
+        keys.append(key)
+        operations.append(ops.convert_to_tensor(list))
+      input_queue = tf.train.slice_input_producer(operations, shuffle=is_train)
+      tensors = []
+      for i in range(len(keys)):
+        if (keys[i] == 'images'):
+          with tf.variable_scope('images'):
+            file_contents = tf.read_file(input_queue[i])
+            image = tf.image.decode_jpeg(file_contents, ratio=1.0)
+            image = tf.cast(image, tf.float32)
+            image.set_shape([None, None, None])
+            image = self._scale_and_crop(image, Reader.MIN_INPUT_SIZE)
+            # now the image have shape, which we can use
+            if (is_train):
+              image = self._train_transform(image)
+            else:
+              image = self._test_transform(image)
+            # In order to avoid batch_norm on the input, so we can save our time
+            # by not propagating gradients till the end if we do fine-tuning
+            image = (image - Reader.MEAN_CHANNEL_VALUES) / Reader.MAX_PIXEL_VALUE
+            tensors.append(image)
+        elif (keys[i] == 'labels'):
+          with tf.variable_scope('labels'):
+            tensors.append(tf.cast(input_queue[i], tf.int64))
+        else:
+          tensors.append(input_queue[i])
 
-      input_queue = tf.train.slice_input_producer(
-        [image_op, label_op, fname_op], shuffle=is_train
-      )
-      (image, label, filename) = self._read_image_from_disk(input_queue)
-
-      image = self._scale_and_crop(image, Reader.MIN_INPUT_SIZE)
-      # now the image have shape, which we can use
-      if (is_train):
-        image = self._train_transform(image)
-      else:
-        image = self._test_transform(image)
-
-      # In order to avoid batch_norm on the input, so we can save our time
-      # by not propagating gradients till the end if we do fine-tuning
-      image = (image - Reader.MEAN_CHANNEL_VALUES) / Reader.MAX_PIXEL_VALUE
-
-      # Ensure that the random shuffling has good mixing properties
       min_queue_examples = int(self.fold_size * Reader.MIN_QUEUE_FRACTION)
-
       # Generate a batch of images and labels by building up a queue of examples.
-      images, labels, filenames = self._generate_image_and_label_batch(
-        image, label, filename, batch_size, min_queue_examples, shuffle=is_train
+      input_batches = self._generate_batches(
+        tensors, batch_size, min_queue_examples, shuffle=is_train
       )
+      input_dict = {}
+      for i in range(len(keys)):
+        input_dict[keys[i]] = input_batches[i]
       # Display the training images in the visualizer
       if (is_train):
         prefix = Reader.TRAINING_PREFIX
@@ -233,7 +220,7 @@ def inputs(self, batch_size, is_train):
         prefix = Reader.TESTING_PREFIX
       # images are too heavy for summary, but uncomment for check if needed
       #tf.image_summary(prefix, images, max_images=batch_size)
-      tf.histogram_summary(prefix + '/image_values', images)
-      tf.histogram_summary(prefix + '/labels', labels)
+      tf.histogram_summary(prefix + '/image_values', input_dict['images'])
+      tf.histogram_summary(prefix + '/labels', input_dict['labels'])
 
-      return images, labels, filenames
+      return input_dict

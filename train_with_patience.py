@@ -42,17 +42,19 @@ import writer
 reload(writer)
 from writer import Writer
 
+#CHANGE
 RESULTS_DIR = './results'
 PARAMS_FILE = 'params.json'
-#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
 RESTORING_FILE = None
+#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
+RESTORING_FILE = '/data/mma/skin/molemap/resnet-pretrained/ResNet-L50.ckpt'
 
 #CHANGE
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 EVAL_FREQUENCY = 500
 EVAL_STEP_NUM = 100
-PATIENCE = 5000
-MAX_DECAYS = 3
+PATIENCE = 3000 / EVAL_FREQUENCY
+MAX_DECAYS = 2
 
 DECAY_FACTOR = 0.1
 
@@ -83,7 +85,7 @@ def main(argv=None):
       params['min_test_step'] = params['step']
       params['unchanged'] = 0
     else:
-      params['unchanged'] += EVAL_FREQUENCY
+      params['unchanged'] += 1
       if (params['unchanged'] >= PATIENCE):
         params['learning_rate'] *= DECAY_FACTOR
         params['num_decays'] += 1

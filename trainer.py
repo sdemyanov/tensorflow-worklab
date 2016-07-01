@@ -36,7 +36,7 @@ from session import Session
 class Trainer(object):
 
   BATCH_SIZE = 32
-  MOMENTUM = 0.9
+  #MOMENTUM = 0.9
   PRINT_FREQUENCY = 10
   SAVE_FREQUENCY = None
 
@@ -45,9 +45,10 @@ class Trainer(object):
     with self._graph.as_default():
       reader = Reader(fold_name)
       with tf.device('/gpu:1'):
-        images, labels, scores, _ = reader.inputs(Trainer.BATCH_SIZE, is_train=True)
-        self._network = Network(images, is_train=True, hyper=hyper, features=scores)
-        self._loss = self._network.loss(labels)
+        self._input = reader.inputs(Trainer.BATCH_SIZE, is_train=True)
+        self._network = Network(self._input['images'], is_train=True, hyper=hyper)
+        self._cross_entropy_losses = self._network.cross_entropy_losses(self._input['labels'])
+        self._total_loss = self._network.total_loss(self._input['labels'])
         self._lr_placeholder = tf.placeholder(tf.float32)
         self._train = self._train_op()
         self._all_summaries = tf.merge_all_summaries()
@@ -64,20 +65,22 @@ class Trainer(object):
 
   def _train_op(self):
     tf.scalar_summary('learning_rate', self._lr_placeholder)
-    opt = tf.train.GradientDescentOptimizer(self._lr_placeholder)
-    #opt = tf.train.MomentumOptimizer(self._lr_placeholder, Trainer.MOMENTUM)
-    grads_and_vars = opt.compute_gradients(self._loss)
-    grads_and_vars_mult = []
-    for grad, var in grads_and_vars:
-      grad *= self._network.lr_multipliers[var.op.name]
-      grads_and_vars_mult.append((grad, var))
-      tf.histogram_summary('variables/' + var.op.name, var)
-      tf.histogram_summary('gradients/' + var.op.name, grad)
-    return opt.apply_gradients(grads_and_vars_mult)
+    with tf.variable_scope('train_operation'):
+      opt = tf.train.GradientDescentOptimizer(self._lr_placeholder)
+      #opt = tf.train.MomentumOptimizer(self._lr_placeholder, Trainer.MOMENTUM)
+      grads_and_vars = opt.compute_gradients(self._total_loss)
+      grads_and_vars_mult = []
+      for grad, var in grads_and_vars:
+        grad *= self._network.lr_multipliers[var.op.name]
+        grads_and_vars_mult.append((grad, var))
+        tf.histogram_summary('variables/' + var.op.name, var)
+        tf.histogram_summary('gradients/' + var.op.name, grad)
+      return opt.apply_gradients(grads_and_vars_mult)
+
 
 
   def train(self, learning_rate, step_num, init_step=None, restoring_file=None):
-    print('%s: training...' % datetime.now())
+    print('\n%s: training...' % datetime.now())
     sys.stdout.flush()
 
     session = Session(self._graph, self.models_dir)
@@ -91,15 +94,19 @@ class Trainer(object):
     train_loss = None
     save_loss = 0
     save_step = 0
+    total_loss = 0
     feed_dict={self._lr_placeholder: learning_rate}
     for step in range(init_step+1, last_step+1):
       start_time = time.time()
-      _, loss_batch = session.run([self._train, self._loss],
-                                  feed_dict=feed_dict)
+      _, total_loss_batch, loss_batch = session.run(
+        [self._train, self._total_loss, self._cross_entropy_losses], feed_dict=feed_dict
+      )
       duration = time.time() - start_time
-      assert not np.isnan(loss_batch), 'Model diverged with loss = NaN'
-      print_loss += loss_batch
-      save_loss += loss_batch
+      assert not np.isnan(total_loss_batch), 'Model diverged with loss = NaN'
+      cross_entropy_loss_value = np.mean(loss_batch)
+      print_loss += cross_entropy_loss_value
+      save_loss += cross_entropy_loss_value
+      total_loss += total_loss_batch
       save_step += 1
 
       if ((step - init_step) % Trainer.PRINT_FREQUENCY == 0):
@@ -115,15 +122,17 @@ class Trainer(object):
       if (step == last_step or
         (Trainer.SAVE_FREQUENCY is not None and (step - init_step) % Trainer.SAVE_FREQUENCY == 0)):
         session.save(step)
+        total_loss /= save_step
         train_loss = save_loss / save_step
         print('%s: train_loss = %.3f' % (datetime.now(), train_loss))
-        save_loss = 0
-        save_step = 0
         if (self.writer):
           summary_str = session.run(self._all_summaries, feed_dict=feed_dict)
           self.writer.write_summaries(summary_str, step)
-          self.writer.write_scalars({'losses/training/total_loss': train_loss}, step)
-
+          self.writer.write_scalars({'losses/training/cross_entropy_loss': train_loss,
+                                     'losses/training/total_loss': total_loss}, step)
+        total_loss = 0
+        save_loss = 0
+        save_step = 0
 
     session.stop()
     return step, train_loss

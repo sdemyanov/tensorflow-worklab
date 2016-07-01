@@ -42,27 +42,37 @@ import writer
 reload(writer)
 from writer import Writer
 
+#CHANGE
 RESULTS_DIR = './results'
 PARAMS_FILE = 'params.json'
 HYPER_FILE = 'hyper.json'
 
+RESTORING_FILE = None
+RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
+
 #CHANGE
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 EVAL_FREQUENCY = 500
 EVAL_STEP_NUM = 100
-PATIENCE = 3000
-MAX_DECAYS = 0
+PATIENCE = 3000 / EVAL_FREQUENCY
+MAX_DECAYS = 2
 
 DECAY_FACTOR = 0.1
 
 #CHANGE
-#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
-RESTORING_FILE = None
-LAYERS_NUM = 25
-HYPER_PATIENCE = 3 #layers
+HYPER_VALUE = 1 #layers
+HYPER_STEP = 1
+HYPER_PATIENCE = 5
 
-def model_file(step):
-  return 'model.ckpt' + '-' + str(step)
+MODEL_FILE = 'resnet.py'
+copyfile(os.path.join(dname, MODEL_FILE), os.path.join(RESULTS_DIR, MODEL_FILE))
+
+def get_model_file(step):
+  return MODEL_NAME + '-' + str(step)
+
+def get_results_dir(step):
+  return os.path.join(RESULTS_DIR, str(step))
+
 
 def main(argv=None):
 
@@ -72,13 +82,13 @@ def main(argv=None):
       hyper = json.load(handle)
   else:
     hyper = {}
-    hyper['min_test_step'] = LAYERS_NUM
+    hyper['min_test_step'] = HYPER_VALUE
     hyper['step'] = hyper['min_test_step']
     hyper['unchanged'] = 0
     hyper['restfile'] = RESTORING_FILE
 
   while (hyper['unchanged'] < HYPER_PATIENCE):
-    results_dir = os.path.join(RESULTS_DIR, str(hyper['step']))
+    results_dir = get_results_dir(hyper['step'])
     writer = Writer(results_dir)
     trainer = Trainer(results_dir, 'train', writer, hyper['step'])
     tester = Tester(results_dir, 'valid', writer, hyper['step'])
@@ -89,7 +99,7 @@ def main(argv=None):
         params = json.load(handle)
     else:
       params = {}
-      params['min_test_step'], params['min_test_loss'] = tester.test(EVAL_STEP_NUM)
+      params['min_test_step'], params['min_test_loss'] = tester.test(EVAL_STEP_NUM, restoring_file=hyper['restfile'])
       params['step'] = params['min_test_step']
       params['unchanged'] = 0
       params['num_decays'] = 0
@@ -107,7 +117,7 @@ def main(argv=None):
         params['min_test_step'] = params['step']
         params['unchanged'] = 0
       else:
-        params['unchanged'] += EVAL_FREQUENCY
+        params['unchanged'] += 1
         if (params['unchanged'] >= PATIENCE):
           params['learning_rate'] *= DECAY_FACTOR
           params['num_decays'] += 1
@@ -127,13 +137,13 @@ def main(argv=None):
     else:
       hyper['unchanged'] += 1
 
-    hyper['restfile'] = os.path.join(results_dir, model_file(params['min_test_step']))
-    hyper['step'] += 2
+    hyper['restfile'] = os.path.join(results_dir, get_model_file(params['min_test_step']))
+    hyper['step'] += HYPER_STEP
     with open(hyper_file, 'w') as handle:
       json.dump(hyper, handle, indent=2)
     print(hyper)
 
-    print('\n NEW HYPER PARAMETER: %d' %hyper['step'])
+    print('\nNEW HYPER PARAMETER: %d' %hyper['step'])
 
 
 if __name__ == '__main__':

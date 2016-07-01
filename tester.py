@@ -27,9 +27,6 @@ sys.path.append('../')
 import utils.stats
 reload(utils.stats)
 
-import utils.molemap
-reload(utils.molemap)
-
 import reader
 reload(reader)
 from reader import Reader
@@ -52,10 +49,10 @@ class Tester(object):
       reader = Reader(fold_name)
       self.fold_size = reader.fold_size
       with tf.device('/gpu:1'):
-        images, self._labels, scores, self._filenames = reader.inputs(Tester.BATCH_SIZE, is_train=False)
-        self._network = Network(images, is_train=False, hyper=hyper, features=scores)
+        self._input = reader.inputs(Tester.BATCH_SIZE, is_train=False)
+        self._network = Network(self._input['images'], is_train=False, hyper=hyper)
         self._probs = self._network.probs()
-        self._loss = self._network.loss(self._labels)
+        self._cross_entropy_losses = self._network.cross_entropy_losses(self._input['labels'])
         self._all_summaries = tf.merge_all_summaries()
 
     self.models_dir = models_dir
@@ -66,7 +63,7 @@ class Tester(object):
 
 
   def test(self, step_num=None, init_step=None, restoring_file=None):
-    print('%s: testing...' %datetime.now())
+    print('\n%s: testing...' %datetime.now())
     sys.stdout.flush()
 
     session = Session(self._graph, self.models_dir)
@@ -80,51 +77,39 @@ class Tester(object):
     test_num = step_num * Tester.BATCH_SIZE
     print('%s: test_num=%d' %(datetime.now(), test_num))
 
-    loss_value = 0
+    loss_values = np.zeros(test_num, dtype=np.float32)
     prob_values = np.zeros((test_num, Reader.CLASSES_NUM), dtype=np.float32)
     label_values = np.zeros(test_num, dtype=np.int64)
-    filename_values = []
-    begin = 0
-    start_time = time.time()
 
+    start_time = time.time()
     for step in range(step_num):
       #print('%s: eval_iter=%d' %(datetime.now(), i))
-      loss_batch, prob_batch, label_batch, filename_batch = session.run(
-        [self._loss, self._probs, self._labels, self._filenames]
+      loss_batch, prob_batch, label_batch = session.run(
+        [self._cross_entropy_losses, self._probs, self._input['labels']]
       )
-      loss_value += loss_batch
       begin = step * Tester.BATCH_SIZE
+      loss_values[begin:begin+Tester.BATCH_SIZE] = loss_batch
       prob_values[begin:begin+Tester.BATCH_SIZE, :] = prob_batch
       label_values[begin:begin+Tester.BATCH_SIZE] = label_batch
-      filename_values.extend(filename_batch)
 
     duration = time.time() - start_time
     print('%s: duration = %.1f sec' %(datetime.now(), float(duration)))
     sys.stdout.flush()
 
-    loss_value /= step_num
-    #return loss_value, probs_values, labels_values
-    print('%s: test_loss = %.3f' %(datetime.now(), loss_value))
-
-    mult_acc, bin_acc, auc, bin_sens = self.get_pred_stat(
-      prob_values, label_values, filename_values
-    )
+    test_loss, mult_acc = self.get_all_stat(loss_values, prob_values, label_values)
     if (self.writer):
       summary_str = session.run(self._all_summaries)
       self.writer.write_summaries(summary_str, init_step)
-      self.writer.write_scalars({'losses/testing/total_loss': loss_value,
-                                 'accuracy/multiclass': mult_acc,
-                                 'accuracy/binary': bin_acc,
-                                 'stats/AUC': auc,
-                                 'stats/sensitivity': bin_sens[0],
-                                 'stats/specificity': bin_sens[1]}, init_step)
+      self.writer.write_scalars({'losses/testing/cross_entropy_loss': test_loss,
+                                 'accuracy/multiclass': mult_acc}, init_step)
     session.stop()
-    return init_step, loss_value
+    return init_step, test_loss
 
 
-  def get_pred_stat(self, prob, labels, filenames):
+  def get_all_stat(self, losses, probs, labels):
+    test_loss = np.mean(losses).item()
 
-    confmat = utils.stats.get_pred_confmat(prob, labels)
+    confmat = utils.stats.get_prob_confmat(probs, labels)
     print('Total number of examples: %d' %np.sum(confmat))
     print('Confusion matrix:')
     print(confmat)
@@ -133,24 +118,8 @@ class Tester(object):
     np.set_printoptions(precision=1)
     print('Sensitivities:')
     print(mult_sens*100)
-
     mult_accuracy = utils.stats.get_accuracy(confmat)
     print('Multiclass accuracy: %.1f%%' %(mult_accuracy*100))
+    print ('')
 
-    blocks = [3, 12]
-    binconf = utils.stats.get_block_confmat(confmat, blocks)
-    bin_sens = utils.stats.get_sensitivities(binconf)
-    print('Binary sensitivities:')
-    print(bin_sens*100)
-    print('F1-score: %f' %utils.stats.get_f1_score(binconf))
-    bin_max_accuracy = utils.stats.get_accuracy(binconf)
-    print('Binary max-accuracy: %.1f%%' %(bin_max_accuracy*100))
-
-    binpred = utils.stats.get_block_pred(prob, blocks)
-    binlab = utils.stats.get_block_labels(labels, blocks)
-    bin_sum_accuracy = utils.stats.get_pred_acc(binpred, binlab)
-    print('Binary sum-accuracy: %.1f%%' %(bin_sum_accuracy*100))
-    auc = utils.stats.get_auc_score(binpred[:,0], binlab)
-    print('AUC-score: %f' %auc)
-    #print ('')
-    return mult_accuracy, bin_sum_accuracy, auc, bin_sens
+    return test_loss, mult_accuracy

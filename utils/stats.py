@@ -9,12 +9,12 @@ import numpy as np
 from sklearn import metrics
 
 
-def get_pred_acc(pred, lab):
-  return np.mean(np.argmax(pred, axis=1) == lab)
+def get_prob_acc(prob, lab):
+  return np.mean(np.argmax(prob, axis=1) == lab)
 
 
-def get_auc_score(pred, lab):
-  fpr, tpr, thresholds = metrics.roc_curve(lab, pred, pos_label=0)
+def get_auc_score(prob, lab):
+  fpr, tpr, thresholds = metrics.roc_curve(lab, prob, pos_label=0)
   return metrics.auc(fpr, tpr)
 
 
@@ -36,14 +36,14 @@ def get_accuracy(confmat):
 def get_sensitivities(confmat):
   correct = np.diagonal(confmat)
   overall = np.sum(confmat, 1)
-  return np.divide(np.array(correct, dtype=np.float), overall);
+  return np.divide(np.array(correct, dtype=np.float), overall)
 
 
-def get_pred_confmat(pred, lab):
-  classnum = pred.shape[1]
+def get_prob_confmat(prob, lab):
+  classnum = prob.shape[1]
   mat = np.zeros((classnum, classnum), dtype=int)
-  for pind in xrange(pred.shape[0]):
-    mat[int(lab[pind]), np.argmax(pred[pind, :])] += 1
+  for pind in range(prob.shape[0]):
+    mat[int(lab[pind]), np.argmax(prob[pind, :])] += 1
     #mat = np.transpose(mat)
   return mat
 
@@ -51,37 +51,54 @@ def get_pred_confmat(pred, lab):
 def get_block_confmat(confmat, blocks):
   assert(confmat.shape[0] == confmat.shape[1])
   classnum = confmat.shape[0]
-  assert(np.sum(blocks) == classnum)
+  #assert(np.sum(blocks) == classnum)
   blocknum = len(blocks)
 
   blockconf = np.zeros((blocknum, blocknum))
+  for bi in range(blocknum):
+    for bj in range(blocknum):
+      blockconf[bi, bj] = 0
+      for i in blocks[bi]:
+        for j in blocks[bj]:
+          blockconf[bi, bj] += confmat[i, j]
+  return blockconf
+
+  """
   indi = 0
-  for bi in xrange(blocknum):
+  for bi in range(blocknum):
     indj = 0
-    for bj in xrange(blocknum):
+    for bj in range(blocknum):
       bl = confmat[indi:indi+blocks[bi],indj:indj+blocks[bj]]
       blockconf[bi,bj] = np.sum(np.sum(bl))
       indj += blocks[bj]
     indi += blocks[bi]
   assert(np.sum(np.sum(blockconf)) == np.sum(np.sum(confmat)))
   return blockconf
+  """
 
-
-def get_block_pred(pred, blocks):
-  ind = 0
+def get_block_prob_labels(prob, labels, blocks):
+  # IMPORTANT: blocks must not intersect, otherwise the result is not unique
   blocknum = len(blocks)
-  newpred = np.zeros((pred.shape[0], blocknum))
-  for i in xrange(blocknum):
-    newpred[:,i] = np.sum(pred[:,ind:ind+blocks[i]], 1)
-    ind += blocks[i]
-  return newpred
+  assert prob.shape[0] == labels.shape[0]
+  newprob = np.zeros((prob.shape[0], blocknum))
+  for i in range(blocknum):
+    newprob[:, i] = np.sum(prob[:, blocks[i]], 1)
+  #normalize to have sum = 1
+  mult_coefs = np.sum(newprob, 1, keepdims=True)
+  newprob /= np.tile(mult_coefs, (1, blocknum))
 
-
-def get_block_labels(labels, blocks):
-  newlab = np.zeros(labels.shape)
-  for i in xrange(labels.shape[0]):
-    for j in xrange(len(blocks)):
-      if (labels[i] < np.sum(blocks[:j+1])):
+  newlab = np.zeros(prob.shape[0])
+  missing = []
+  for i in range(prob.shape[0]):
+    is_missing = True
+    for j in range(len(blocks)):
+      if (labels[i] in blocks[j]):
         newlab[i] = j
+        is_missing = False
         break
-  return newlab
+    if (is_missing):
+      missing.append(i)
+
+  newprob = np.delete(newprob, missing, axis=0)
+  newlab = np.delete(newlab, missing, axis=0)
+  return newprob, newlab

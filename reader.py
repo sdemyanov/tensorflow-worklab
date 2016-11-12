@@ -142,7 +142,7 @@ class Reader(object):
 
   def _test_transform(self, image):
     with tf.variable_scope('test_transform'):
-      zoom_mean = (Reader.ZOOM_RANGE[0] + Reader.ZOOM_RANGE[0]) / 2
+      zoom_mean = (Reader.ZOOM_RANGE[0] + Reader.ZOOM_RANGE[1]) / 2
       image = self._zoom_and_crop(image, Reader.SCALE_SIZE, zoom_mean)
       #image = self._scale_and_crop(image, Reader.SCALE_SIZE)
       image = self._central_crop(image, Reader.IMAGE_SIZE)

@@ -155,6 +155,8 @@ class Reader(object):
 
   @classmethod
   def _generate_batches(cls, tensors, batch_size):
+    print 'num_threads:', cls.NUM_THREADS
+    print 'capacity:', cls.QUEUE_CAPACITY
     args = {'tensors': tensors,
             'batch_size': batch_size,
             'num_threads': cls.NUM_THREADS,
@@ -175,7 +177,7 @@ class Reader(object):
       input_queue = tf.train.slice_input_producer(self._ops, shuffle=is_train)
       tensors = self._collect_tensors(self._opkeys, input_queue, is_train)
       # Generate a batch of images and labels by building up a queue of examples.
-      input_batches = Reader._generate_batches(tensors, batch_size)
+      input_batches = self._generate_batches(tensors, batch_size)
       input_dict = {}
       for i, key in enumerate(self._opkeys):
         input_dict[key] = input_batches[i]

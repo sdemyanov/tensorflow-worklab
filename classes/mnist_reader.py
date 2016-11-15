@@ -72,9 +72,9 @@ class MnistReader(Reader):
           #image = self._random_zoom_and_crop(image, self._get_scale_size(), MnistReader.MAX_ZOOM)
           #print 'last', image.get_shape().as_list()
           #if is_train:
-          #  image = MnistReader._train_transform(image)
+          #  image = self._train_transform(image)
           #else:
-          #  image = MnistReader._test_transform(image)
+          #  image = self._test_transform(image)
           image = (image - MnistReader.MEAN_CHANNEL_VALUES) / MnistReader.MAX_PIXEL_VALUE
           tensors.append(image)
         elif key == 'labels':

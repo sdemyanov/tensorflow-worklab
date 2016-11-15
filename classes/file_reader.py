@@ -69,9 +69,9 @@ class FileReader(Reader):
           image.set_shape([None, None, FileReader.CHANNEL_NUM])
           image = self._scale_and_crop(image, FileReader.MIN_INPUT_SIZE)
           if is_train:
-            image = FileReader._train_transform(image)
+            image = self._train_transform(image)
           else:
-            image = FileReader._test_transform(image)
+            image = self._test_transform(image)
           image = (image - FileReader.MEAN_CHANNEL_VALUES) / FileReader.MAX_PIXEL_VALUE
           tensors.append(image)
         elif key == 'labels':

@@ -57,7 +57,8 @@ TEST_PARAMS = {'restoring_file': paths.RESTORING_FILE,
                'init_step': None,
                'step_num': EVAL_STEP_NUM,
                'epoch_num': 1,
-               'load_results': LOAD_RESULTS}
+               'load_results': LOAD_RESULTS,
+               'model_name': paths.MODEL_NAME}
 
 def main(argv=None):
 

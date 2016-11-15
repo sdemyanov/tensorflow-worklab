@@ -32,6 +32,8 @@ class MnistReader(Reader):
   MEAN_CHANNEL_VALUES = [33.3184214498]
   IMAGE_SHAPE = [IMAGE_SIZE, IMAGE_SIZE, CHANNEL_NUM]
 
+  QUEUE_CAPACITY = 10
+  NUM_THREADS = 8
 
   def _get_lists(self, fold_name):
     data_dir = paths.DATA_DIR

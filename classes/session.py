@@ -21,11 +21,10 @@ import os
 class Session(object):
 
   GPU_SIZE = 12 #GB
-  MODEL_NAME = 'model.ckpt'
   RESTORE_ANYWAY = False
   #RESTORE_ANYWAY = True
 
-  def __init__(self, graph, path, memory=None):
+  def __init__(self, graph, path, model_name, memory=None):
 
     config = tf.ConfigProto()
     config.allow_soft_placement=True
@@ -38,13 +37,14 @@ class Session(object):
     self._coord = tf.train.Coordinator()
     self._threads = []
     self._path = path
+    self._model_name = model_name
     self.model_file, self.init_step = self._get_checkpoint()
     with graph.as_default():
       self._saver = tf.train.Saver(tf.all_variables())
 
 
   def _get_model_file(self, step):
-    return os.path.join(self._path, Session.MODEL_NAME+'-'+str(step))
+    return os.path.join(self._path, self._model_name+'-'+str(step))
 
 
   def _get_checkpoint(self):
@@ -91,8 +91,8 @@ class Session(object):
         model_file = None
       else:
         model_file = self._get_model_file(init_step)
-        if (not os.path.isfile(model_file)):
-          print(model_file)
+        if not os.path.isfile(model_file):
+          print model_file
           assert False, 'Model file for the specified step does not exist'
     else:
       model_file, init_step = self.model_file, self.init_step
@@ -100,15 +100,18 @@ class Session(object):
     if model_file is not None:
       print 'Restoring from saved model %s' % model_file
       self._restore_vars(model_file)
+      print 'Restoring finished'
     else:
       print 'Initializing by random variables...'
       self._init_vars()
+      print 'Initialization finished'
 
     if restoring_file is not None and len(network.rest_names) > 0:
       if model_file is None or Session.RESTORE_ANYWAY:
         print 'WARNING: Restoring from external model %s' % restoring_file
         #print(network.rest_names)
         self._restore_vars(restoring_file, network.rest_names)
+        print 'Restoring finished'
 
 
   def start(self):

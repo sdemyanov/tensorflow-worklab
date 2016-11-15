@@ -44,10 +44,10 @@ class Tester(object):
     self._batch_size = params['batch_size']
     self._graph = tf.Graph()
     with self._graph.as_default():
-      reader = Reader(self.fold_name)
-      self.fold_size = reader.fold_size
-      params['classes_num'] = reader.CLASSES_NUM
       with tf.device('/gpu:' + str(params['gpu'])):
+        reader = Reader(self.fold_name)
+        self.fold_size = reader.fold_size
+        params['classes_num'] = reader.CLASSES_NUM
         self._input = reader.inputs(self._batch_size, params['is_train'])
         self._classifier = Classifier(params, self._input['images'])
         self._probs = self._classifier.probs()
@@ -64,7 +64,7 @@ class Tester(object):
     print('\n%s: testing...' %datetime.now())
     sys.stdout.flush()
 
-    session = Session(self._graph, self.results_dir)
+    session = Session(self._graph, self.results_dir, params['model_name'])
     if 'init_step' not in params or params['init_step'] is None:
       init_step = session.init_step
     else:

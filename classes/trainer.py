@@ -31,9 +31,9 @@ class Trainer(object):
     self._batch_size = params['batch_size']
     self._graph = tf.Graph()
     with self._graph.as_default():
-      reader = Reader(params['fold_name'])
-      params['classes_num'] = reader.CLASSES_NUM
-      with tf.device('/gpu:'+str(params['gpu'])):
+      with tf.device('/gpu:' + str(params['gpu'])):
+        reader = Reader(params['fold_name'])
+        params['classes_num'] = reader.CLASSES_NUM
         self._input = reader.inputs(self._batch_size, params['is_train'])
         self._classifier = Classifier(params, self._input['images'])
         self._cross_entropy, self._total_loss = self._classifier.losses(self._input['labels'])
@@ -47,7 +47,7 @@ class Trainer(object):
       tf.gfile.MakeDirs(self.results_dir)
 
     self.writer = writer
-    if self.writer is not None:
+    if self.writer is not None and params['write_graph']:
       self.writer.write_graph(self._graph)
 
 
@@ -78,7 +78,7 @@ class Trainer(object):
     total_loss = 0
     feed_dict={self._lr_placeholder: params['learning_rate']}
 
-    session = Session(self._graph, self.results_dir)
+    session = Session(self._graph, self.results_dir, params['model_name'])
     if 'init_step' not in params or params['init_step'] is None:
       init_step = session.init_step
     else:
@@ -102,7 +102,7 @@ class Trainer(object):
       total_loss += total_loss_batch
       save_step += 1
 
-      if ((step - init_step) % params['print_frequency'] == 0):
+      if (step - init_step) % params['print_frequency'] == 0:
         examples_per_sec = self._batch_size / duration
         format_str = ('%s: step %d, loss = %.2f, lr = %f, '
                       '(%.1f examples/sec; %.3f sec/batch)')

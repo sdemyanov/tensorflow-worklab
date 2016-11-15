@@ -34,7 +34,7 @@ class Reader(object):
   RANDOM_FLIP = False
 
   QUEUE_CAPACITY = 5
-  NUM_THREADS = 4
+  NUM_THREADS = 8
 
 
   def __init__(self, fold_name):
@@ -158,8 +158,7 @@ class Reader(object):
     args = {'tensors': tensors,
             'batch_size': batch_size,
             'num_threads': cls.NUM_THREADS,
-            'capacity': cls.QUEUE_CAPACITY * batch_size,
-            'name': 'batch'}
+            'capacity': cls.QUEUE_CAPACITY * batch_size}
     #if is_train:
     #  args['min_after_dequeue'] = min_queue_examples
     #  return tf.train.shuffle_batch(**args)

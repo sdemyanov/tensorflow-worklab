@@ -111,18 +111,15 @@ class Network(object):
   ### BASIC LAYERS ###
 
   def _activation_summary(self, output, scope='summary'):
-    pass
+    return
     # no summary for test network
-    if not self.is_train:
-      return
-    # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
-    # session. This helps the clarity of presentation on tensorboard.
-    with tf.variable_scope(scope):
-      #tensor_name = re.sub('%s_[0-9]*/' % Network.TOWER_NAME, '', scope)
-      tensor_name = output.op.name
-      tf.histogram_summary('activations/' + tensor_name, output)
-      zero_fraction = tf.nn.zero_fraction(output)
-      tf.scalar_summary('sparsity/' + tensor_name, zero_fraction)
+    #if not self.is_train:
+    #  return
+    #with tf.variable_scope(scope):
+    #  tensor_name = output.op.name
+    #  tf.histogram_summary('activations/' + tensor_name, output)
+    #  zero_fraction = tf.nn.zero_fraction(output)
+    #  tf.scalar_summary('sparsity/' + tensor_name, zero_fraction)
 
 
   def _nonlinearity(self, output):

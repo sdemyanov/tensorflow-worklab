@@ -34,7 +34,7 @@ from classes.trainer import Trainer
 from classes.writer import Writer
 import paths
 
-GPU = 0
+GPU = 1
 TRAIN_DECAY = 0.9
 BATCH_SIZE = 32
 LEARNING_RATE = 0.01
@@ -46,7 +46,8 @@ TRAIN_INIT = {'is_train': True,
               'decay': TRAIN_DECAY,
               'batch_size': BATCH_SIZE,
               'fold_name': paths.TRAIN_FOLD,
-              'results_dir': paths.RESULTS_DIR}
+              'results_dir': paths.RESULTS_DIR,
+              'write_graph': False}
 
 TRAIN_PARAMS = {'restoring_file': paths.RESTORING_FILE,
                 'init_step': None,
@@ -54,7 +55,8 @@ TRAIN_PARAMS = {'restoring_file': paths.RESTORING_FILE,
                 'learning_rate': LEARNING_RATE,
                 'momentum': MOMENTUM,
                 'print_frequency': 10,
-                'save_frequency': None}
+                'save_frequency': None,
+                'model_name': paths.MODEL_NAME}
 
 def main(argv=None):
   MODEL_FILE = 'mnist_classifier.py'

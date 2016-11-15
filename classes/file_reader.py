@@ -18,7 +18,6 @@
 import tensorflow as tf
 import json
 import os
-import numpy as np
 
 from reader import Reader
 

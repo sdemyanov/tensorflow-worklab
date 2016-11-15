@@ -37,7 +37,7 @@ from classes.writer import Writer
 import paths
 
 #CHANGE
-GPU = 0
+GPU = 1
 TRAIN_DECAY = 0.99
 TRAIN_BATCH_SIZE = 32
 TEST_BATCH_SIZE = 16
@@ -56,7 +56,8 @@ TRAIN_INIT = {'is_train': True,
               'decay': TRAIN_DECAY,
               'batch_size': TRAIN_BATCH_SIZE,
               'fold_name': paths.TRAIN_FOLD,
-              'results_dir': paths.RESULTS_DIR}
+              'results_dir': paths.RESULTS_DIR,
+              'write_graph': False}
 
 TEST_INIT = {'is_train': False,
              'gpu': GPU,
@@ -71,13 +72,22 @@ TRAIN_PARAMS = {'restoring_file': paths.RESTORING_FILE,
                 'learning_rate': LEARNING_RATE,
                 'momentum': MOMENTUM,
                 'print_frequency': 10,
-                'save_frequency': None}
+                'save_frequency': None,
+                'model_name': paths.MODEL_NAME}
 
 TEST_PARAMS = {'restoring_file': None,
                'init_step': None,
                'step_num': EVAL_STEP_NUM,
                'epoch_num': 1,
-               'load_results': False}
+               'load_results': False,
+               'model_name': paths.MODEL_NAME}
+
+
+def remove_model(step):
+  removed_model = os.path.join(paths.RESULTS_DIR, paths.MODEL_NAME + '-' + str(step))
+  if os.path.isfile(removed_model):
+    print('Removing:', removed_model)
+    os.remove(removed_model)
 
 
 def main(argv=None):
@@ -97,20 +107,25 @@ def main(argv=None):
     params['unchanged'] = 0
     params['num_decays'] = 0
 
-  while (params['num_decays'] <= MAX_DECAYS):
+  while params['num_decays'] <= MAX_DECAYS:
+    prev_step = params['init_step']
     params['init_step'], _ = trainer.train(params)
     _, test_loss = tester.test(TEST_PARAMS)
-    if (test_loss < params['min_test_loss']):
-      params['min_test_loss'] = test_loss
+    if test_loss < params['min_test_loss']:
+      remove_model(params['min_test_step'])
       params['min_test_step'] = params['init_step']
+      params['min_test_loss'] = test_loss
       params['unchanged'] = 0
     else:
       params['unchanged'] += 1
-      if (params['unchanged'] >= PATIENCE):
+      if params['unchanged'] >= PATIENCE:
         params['learning_rate'] *= DECAY_FACTOR
         params['num_decays'] += 1
         params['init_step'] = params['min_test_step']
         params['unchanged'] = 0
+    if prev_step != params['min_test_step']:
+      remove_model(prev_step)
+
 
     with open(paths.PARAMS_FILE, 'w') as handle:
       json.dump(params, handle, indent=2)

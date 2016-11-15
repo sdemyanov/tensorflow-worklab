@@ -21,45 +21,33 @@ import time
 import sys
 from datetime import datetime
 
-import reader
-reload(reader)
-from reader import Reader
-
-import resnet
-reload(resnet)
-from resnet import Network
-
-import session
-reload(session)
 from session import Session
+from mnist_reader import MnistReader as Reader
+from mnist_classifier import MnistClassifier as Classifier
 
 class Trainer(object):
 
-  BATCH_SIZE = 32
-  #MOMENTUM = 0.9
-  PRINT_FREQUENCY = 10
-  SAVE_FREQUENCY = None
-
-  def __init__(self, models_dir, fold_name, writer=None, hyper=None):
+  def __init__(self, params, writer=None):
+    self._batch_size = params['batch_size']
     self._graph = tf.Graph()
     with self._graph.as_default():
-      reader = Reader(fold_name)
-      with tf.device('/gpu:1'):
-        self._input = reader.inputs(Trainer.BATCH_SIZE, is_train=True)
-        self._network = Network(self._input['images'], is_train=True, hyper=hyper)
-        self._cross_entropy_losses = self._network.cross_entropy_losses(self._input['labels'])
-        self._total_loss = self._network.total_loss(self._input['labels'])
+      reader = Reader(params['fold_name'])
+      params['classes_num'] = reader.CLASSES_NUM
+      with tf.device('/gpu:'+str(params['gpu'])):
+        self._input = reader.inputs(self._batch_size, params['is_train'])
+        self._classifier = Classifier(params, self._input['images'])
+        self._cross_entropy, self._total_loss = self._classifier.losses(self._input['labels'])
         self._lr_placeholder = tf.placeholder(tf.float32)
         self._train = self._train_op()
         self._all_summaries = tf.merge_all_summaries()
 
-    self.models_dir = models_dir
-    print('Trainer model folder: %s' %self.models_dir)
-    if not tf.gfile.Exists(self.models_dir):
-      tf.gfile.MakeDirs(self.models_dir)
+    self.results_dir = params['results_dir']
+    print('Trainer model folder: %s' %self.results_dir)
+    if not tf.gfile.Exists(self.results_dir):
+      tf.gfile.MakeDirs(self.results_dir)
 
     self.writer = writer
-    if (self.writer):
+    if self.writer is not None:
       self.writer.write_graph(self._graph)
 
 
@@ -71,61 +59,66 @@ class Trainer(object):
       grads_and_vars = opt.compute_gradients(self._total_loss)
       grads_and_vars_mult = []
       for grad, var in grads_and_vars:
-        grad *= self._network.lr_multipliers[var.op.name]
+        grad *= self._classifier.lr_multipliers[var.op.name]
         grads_and_vars_mult.append((grad, var))
-        tf.histogram_summary('variables/' + var.op.name, var)
-        tf.histogram_summary('gradients/' + var.op.name, grad)
+        #tf.histogram_summary('variables/' + var.op.name, var)
+        #tf.histogram_summary('gradients/' + var.op.name, grad)
       return opt.apply_gradients(grads_and_vars_mult)
 
 
 
-  def train(self, learning_rate, step_num, init_step=None, restoring_file=None):
+  def train(self, params):
     print('\n%s: training...' % datetime.now())
     sys.stdout.flush()
-
-    session = Session(self._graph, self.models_dir)
-    init_step = session.init(self._network, init_step, restoring_file)
-    session.start()
-
-    last_step = init_step+step_num
-    print('%s: training till: %d steps' %(datetime.now(), last_step))
 
     print_loss = 0
     train_loss = None
     save_loss = 0
     save_step = 0
     total_loss = 0
-    feed_dict={self._lr_placeholder: learning_rate}
+    feed_dict={self._lr_placeholder: params['learning_rate']}
+
+    session = Session(self._graph, self.results_dir)
+    if 'init_step' not in params or params['init_step'] is None:
+      init_step = session.init_step
+    else:
+      init_step = params['init_step']
+    session.init(self._classifier, init_step, params['restoring_file'])
+    session.start()
+
+    last_step = init_step + params['step_num']
+    print('%s: training till: %d steps' % (datetime.now(), last_step))
     for step in range(init_step+1, last_step+1):
+
       start_time = time.time()
-      _, total_loss_batch, loss_batch = session.run(
-        [self._train, self._total_loss, self._cross_entropy_losses], feed_dict=feed_dict
+      _, cross_entropy_batch, total_loss_batch = session.run(
+        [self._train, self._cross_entropy, self._total_loss], feed_dict=feed_dict
       )
       duration = time.time() - start_time
       assert not np.isnan(total_loss_batch), 'Model diverged with loss = NaN'
-      cross_entropy_loss_value = np.mean(loss_batch)
+      cross_entropy_loss_value = np.mean(cross_entropy_batch)
       print_loss += cross_entropy_loss_value
       save_loss += cross_entropy_loss_value
       total_loss += total_loss_batch
       save_step += 1
 
-      if ((step - init_step) % Trainer.PRINT_FREQUENCY == 0):
-        examples_per_sec = Trainer.BATCH_SIZE / duration
+      if ((step - init_step) % params['print_frequency'] == 0):
+        examples_per_sec = self._batch_size / duration
         format_str = ('%s: step %d, loss = %.2f, lr = %f, '
                       '(%.1f examples/sec; %.3f sec/batch)')
-        print_loss /= Trainer.PRINT_FREQUENCY
-        print(format_str % (datetime.now(), step, print_loss, learning_rate,
+        print_loss /= params['print_frequency']
+        print(format_str % (datetime.now(), step, print_loss, params['learning_rate'],
                             examples_per_sec, float(duration)))
         print_loss = 0
 
       # Save the model checkpoint and summaries periodically.
       if (step == last_step or
-        (Trainer.SAVE_FREQUENCY is not None and (step - init_step) % Trainer.SAVE_FREQUENCY == 0)):
+        (params['save_frequency'] is not None and (step - init_step) % params['save_frequency'] == 0)):
         session.save(step)
         total_loss /= save_step
         train_loss = save_loss / save_step
         print('%s: train_loss = %.3f' % (datetime.now(), train_loss))
-        if (self.writer):
+        if self.writer is not None:
           summary_str = session.run(self._all_summaries, feed_dict=feed_dict)
           self.writer.write_summaries(summary_str, step)
           self.writer.write_scalars({'losses/training/cross_entropy_loss': train_loss,
@@ -133,6 +126,9 @@ class Trainer(object):
         total_loss = 0
         save_loss = 0
         save_step = 0
+
+      if session.should_stop():
+        break
 
     session.stop()
     return step, train_loss

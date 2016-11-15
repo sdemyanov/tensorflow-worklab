@@ -51,14 +51,7 @@ Set up the path to the restored model in the training script. For example, use [
 
 POTENTIAL PROBLEMS
 
-- First of all, adjust all the paths and other parameters to your own! Prepare the dictionary with file paths and their labels! The example is not supposed to be launched immediately. The dictionaries for classification should look like:
-```
-{
-  "path_to_image1": label1, 
-  "path_to_image2": label2,
-  .....
-}
-```
+- First of all, adjust all the paths and other parameters to your own! Prepare the dictionary with file paths and their labels! The example is not supposed to be launched immediately.
 
 - In the current version (v0.8) of Tensorflow you cannot specify 1x1 convolutions with stride > 1, which are requred by ResNet models. To overcome this problem, install the latest nightly build. You can find it [here](ci.tensorflow.org/view/Nightly/job/nigntly-matrix-linux-gpu). Install it using
 ```

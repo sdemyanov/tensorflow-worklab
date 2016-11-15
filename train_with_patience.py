@@ -30,68 +30,89 @@ os.chdir(dname)
 import sys
 sys.path.append(dname)
 
-import trainer
-reload(trainer)
-from trainer import Trainer
+from classes.trainer import Trainer
+from classes.tester import Tester
+from classes.writer import Writer
 
-import tester
-reload(tester)
-from tester import Tester
-
-import writer
-reload(writer)
-from writer import Writer
+import paths
 
 #CHANGE
-RESULTS_DIR = './results'
-PARAMS_FILE = 'params.json'
-RESTORING_FILE = None
-RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L50.ckpt'
-
-#CHANGE
+GPU = 0
+TRAIN_DECAY = 0.99
+TRAIN_BATCH_SIZE = 32
+TEST_BATCH_SIZE = 16
 LEARNING_RATE = 0.01
-EVAL_FREQUENCY = 500
-EVAL_STEP_NUM = 100
+MOMENTUM = 0.9
+EVAL_FREQUENCY = 1000
+EVAL_STEP_NUM = 625
 PATIENCE = 3000 / EVAL_FREQUENCY
 MAX_DECAYS = 2
-
 DECAY_FACTOR = 0.1
+VALID_FOLD = paths.VALID_FOLD
+VALID_FOLD = paths.TEST_FOLD
+
+TRAIN_INIT = {'is_train': True,
+              'gpu': GPU,
+              'decay': TRAIN_DECAY,
+              'batch_size': TRAIN_BATCH_SIZE,
+              'fold_name': paths.TRAIN_FOLD,
+              'results_dir': paths.RESULTS_DIR}
+
+TEST_INIT = {'is_train': False,
+             'gpu': GPU,
+             'decay': TRAIN_DECAY,
+             'batch_size': TEST_BATCH_SIZE,
+             'fold_name': VALID_FOLD,
+             'results_dir': paths.RESULTS_DIR}
+
+TRAIN_PARAMS = {'restoring_file': paths.RESTORING_FILE,
+                'init_step': None,
+                'step_num': EVAL_FREQUENCY,
+                'learning_rate': LEARNING_RATE,
+                'momentum': MOMENTUM,
+                'print_frequency': 10,
+                'save_frequency': None}
+
+TEST_PARAMS = {'restoring_file': None,
+               'init_step': None,
+               'step_num': EVAL_STEP_NUM,
+               'epoch_num': 1,
+               'load_results': False}
+
 
 def main(argv=None):
 
-  writer = Writer(RESULTS_DIR)
-  trainer = Trainer(RESULTS_DIR, 'train', writer)
-  tester = Tester(RESULTS_DIR, 'valid', writer)
+  writer = Writer(paths.RESULTS_DIR)
+  trainer = Trainer(TRAIN_INIT, writer)
 
-  params_file = os.path.join(RESULTS_DIR, PARAMS_FILE)
-  if (os.path.isfile(params_file)):
-    with open(params_file, 'r') as handle:
+  tester = Tester(TEST_INIT, writer)
+
+  if os.path.isfile(paths.PARAMS_FILE):
+    with open(paths.PARAMS_FILE, 'r') as handle:
       params = json.load(handle)
   else:
-    params = {}
-    params['min_test_step'], params['min_test_loss'] = tester.test(EVAL_STEP_NUM)
-    params['step'] = params['min_test_step']
+    params = TRAIN_PARAMS
+    params['min_test_step'], params['min_test_loss'] = tester.test(TEST_PARAMS)
+    params['init_step'] = params['min_test_step']
     params['unchanged'] = 0
     params['num_decays'] = 0
-    params['learning_rate'] = LEARNING_RATE
 
   while (params['num_decays'] <= MAX_DECAYS):
-    params['step'], _ = trainer.train(params['learning_rate'], EVAL_FREQUENCY,
-                                      params['step'], RESTORING_FILE)
-    _, test_loss = tester.test(EVAL_STEP_NUM, params['step'])
+    params['init_step'], _ = trainer.train(params)
+    _, test_loss = tester.test(TEST_PARAMS)
     if (test_loss < params['min_test_loss']):
       params['min_test_loss'] = test_loss
-      params['min_test_step'] = params['step']
+      params['min_test_step'] = params['init_step']
       params['unchanged'] = 0
     else:
       params['unchanged'] += 1
       if (params['unchanged'] >= PATIENCE):
         params['learning_rate'] *= DECAY_FACTOR
         params['num_decays'] += 1
-        params['step'] = params['min_test_step']
+        params['init_step'] = params['min_test_step']
         params['unchanged'] = 0
 
-    with open(params_file, 'w') as handle:
+    with open(paths.PARAMS_FILE, 'w') as handle:
       json.dump(params, handle, indent=2)
     print(params)
 

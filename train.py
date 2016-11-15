@@ -19,8 +19,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import tensorflow as tf
+import os
+from shutil import copyfile
 
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -29,27 +30,40 @@ os.chdir(dname)
 import sys
 sys.path.append(dname)
 
-import trainer
-reload(trainer)
-from trainer import Trainer
+from classes.trainer import Trainer
+from classes.writer import Writer
+import paths
 
-import writer
-reload(writer)
-from writer import Writer
-
-RESULTS_DIR = './results'
-#RESTORING_FILE = '/path/to/resnet-pretrained/ResNet-L101.ckpt'
-RESTORING_FILE = None
-
+GPU = 0
+TRAIN_DECAY = 0.9
+BATCH_SIZE = 32
+LEARNING_RATE = 0.01
+MOMENTUM = 0.9
 EVAL_FREQUENCY = 100
 
-#Launched just to update batch moving averages
-LEARNING_RATE = 0
+TRAIN_INIT = {'is_train': True,
+              'gpu': GPU,
+              'decay': TRAIN_DECAY,
+              'batch_size': BATCH_SIZE,
+              'fold_name': paths.TRAIN_FOLD,
+              'results_dir': paths.RESULTS_DIR}
+
+TRAIN_PARAMS = {'restoring_file': paths.RESTORING_FILE,
+                'init_step': None,
+                'step_num': EVAL_FREQUENCY,
+                'learning_rate': LEARNING_RATE,
+                'momentum': MOMENTUM,
+                'print_frequency': 10,
+                'save_frequency': None}
 
 def main(argv=None):
-  writer = Writer(RESULTS_DIR)
-  trainer = Trainer(RESULTS_DIR, 'train', writer)
-  trainer.train(LEARNING_RATE, EVAL_FREQUENCY, init_step=None, restoring_file=RESTORING_FILE)
+  MODEL_FILE = 'mnist_classifier.py'
+  copyfile(os.path.join(dname, 'classes', MODEL_FILE), 
+          os.path.join(paths.RESULTS_DIR, MODEL_FILE))
+
+  writer = Writer(paths.RESULTS_DIR) # Writer summary folder
+  trainer = Trainer(TRAIN_INIT, writer)
+  trainer.train(TRAIN_PARAMS)
 
 
 if __name__ == '__main__':

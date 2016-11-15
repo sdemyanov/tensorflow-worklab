@@ -31,13 +31,14 @@ class Session(object):
     config.allow_soft_placement=True
     config.log_device_placement=False
     config.gpu_options.allow_growth=True
-    if (memory is not None):
+    if memory is not None:
       fraction = float(memory) / Session.GPU_SIZE
       config.gpu_options.per_process_gpu_memory_fraction = fraction
     self._sess = tf.Session(graph=graph, config=config)
     self._coord = tf.train.Coordinator()
     self._threads = []
     self._path = path
+    self.model_file, self.init_step = self._get_checkpoint()
     with graph.as_default():
       self._saver = tf.train.Saver(tf.all_variables())
 
@@ -68,7 +69,7 @@ class Session(object):
 
   def _restore_vars(self, model_file, rest_names=None):
     with self._sess.graph.as_default():
-      if (rest_names is None):
+      if rest_names is None:
         restorer = tf.train.Saver(tf.all_variables())
       else:
         restorer = tf.train.Saver(rest_names)
@@ -78,38 +79,36 @@ class Session(object):
   def save(self, step):
     model_file = self._get_model_file(step)
     self._saver.save(self._sess, model_file, write_meta_graph=False)
-    print('Saving model to %s, step=%d' %(model_file, step))
+    print 'Saving model to %s, step=%d' % (model_file, step)
 
 
-  def init(self, network, step=None, restoring_file=None):
+  def init(self, network, init_step=None, restoring_file=None):
     # use step=None to init from the last model, if there is any
     # use step=0 to init from a restoring model, or to init from scratch
-    # use step>0 to init from a particular savel model
-    if (step is not None):
-      if (step == 0):
+    # use step>0 to init from a particular saved model
+    if init_step is not None:
+      if init_step == 0:
         model_file = None
       else:
-        model_file = self._get_model_file(step)
+        model_file = self._get_model_file(init_step)
         if (not os.path.isfile(model_file)):
           print(model_file)
           assert False, 'Model file for the specified step does not exist'
     else:
-      model_file, step = self._get_checkpoint()
+      model_file, init_step = self.model_file, self.init_step
 
-    if (model_file is not None):
-      print('Restoring from saved model %s' %model_file)
+    if model_file is not None:
+      print 'Restoring from saved model %s' % model_file
       self._restore_vars(model_file)
     else:
-      print('Initializing by random variables...')
+      print 'Initializing by random variables...'
       self._init_vars()
 
-    if (restoring_file is not None and len(network.rest_names) > 0):
-      if (model_file is None or Session.RESTORE_ANYWAY):
-        print('WARNING: Restoring from external model %s' %restoring_file)
+    if restoring_file is not None and len(network.rest_names) > 0:
+      if model_file is None or Session.RESTORE_ANYWAY:
+        print 'WARNING: Restoring from external model %s' % restoring_file
         #print(network.rest_names)
         self._restore_vars(restoring_file, network.rest_names)
-
-    return step
 
 
   def start(self):
@@ -134,3 +133,7 @@ class Session(object):
     self._coord.request_stop()
     self._coord.join(self._threads) #, stop_grace_period_secs=10)
     self._sess.close()
+
+
+  def should_stop(self):
+    return self._coord.should_stop()

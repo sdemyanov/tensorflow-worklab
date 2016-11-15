@@ -17,59 +17,52 @@
 
 import tensorflow as tf
 
-import reader
-reload(reader)
-from reader import Reader
-
 class Network(object):
 
-  TRAIN_DECAY = 0.99    # The decay to use for the moving average.
   STDDEV = 1e-4
   BN_EPS = 1e-5
-  LAYER_DROPOUT_RATE = None
 
   INIT_SCOPE = 'init_scope'
   LOSSES_NAME = 'losses'
   TRAINING_PREFIX = 'training'
   TESTING_PREFIX = 'testing'
 
-  def __init__(self, images, is_train, hyper=None, features=None):
-    self.images = images
-    self.is_train = is_train
-    self._decay = Network.TRAIN_DECAY
-    if (is_train):
+  def __init__(self, params):
+    #self.batch_size = self.shape(images, 0)
+    self.is_train = params['is_train']
+    self.decay = params['decay']
+    self.classes_num = params['classes_num']
+    if self.is_train:
       self._prefix = Network.TRAINING_PREFIX
     else:
       self._prefix = Network.TESTING_PREFIX
     self.lr_multipliers = {}
     self.rest_names = {}
-    if (features is not None):
-      assert len(features.get_shape().as_list()) == 2, 'features must be one-dimensional'
-    self._output = self._construct(self.images, hyper, features)
+    self._output = None # redefine it in a derived class
 
-
-  def shape(self, output, dim=None):
+  @staticmethod
+  def shape(output, dim=None):
     shape = output.get_shape().as_list()
-    if (dim is not None):
+    if dim is not None:
       return shape[dim]
     return shape
 
-
-  def _output_elem(self, output):
-    shape = self.shape(output)
+  @classmethod
+  def _output_elem(cls, output):
+    shape = cls.shape(output)
     elem = 1
     for i in range(1, len(shape)):
       elem *= shape[i]
     return elem
 
-
-  def _append(self, restore, appendix):
+  @staticmethod
+  def _append(restore, appendix):
     if (restore == False or restore == True):
       return restore
     return restore + '/' + appendix
 
-
-  def _set_weight_decay(self, var, weight_decay):
+  @staticmethod
+  def _set_weight_decay(var, weight_decay):
     if (weight_decay is not None) and (weight_decay > 0):
       weight_decay = tf.mul(tf.nn.l2_loss(var), weight_decay) #, name=var.name)
       tf.add_to_collection(Network.LOSSES_NAME, weight_decay)
@@ -80,9 +73,9 @@ class Network(object):
 
 
   def _set_restoring(self, var, restore=True):
-    if (restore == False):
+    if restore == False:
       return
-    if (restore == True):
+    if restore == True:
       restore = var.op.name
     self.rest_names[restore] = var
     #print("%s: %s" %(var.op.name, restore))
@@ -93,8 +86,8 @@ class Network(object):
     is_trainable = (lr_mult > 0)
     var = tf.get_variable(name=name, shape=shape,
                           initializer=initializer, trainable=is_trainable)
-    if (is_trainable):
-      self._set_weight_decay(var, weight_decay)
+    if is_trainable:
+      Network._set_weight_decay(var, weight_decay)
       self._set_lr_mult(var, lr_mult)
 
     self._set_restoring(var, restore)
@@ -118,8 +111,9 @@ class Network(object):
   ### BASIC LAYERS ###
 
   def _activation_summary(self, output, scope='summary'):
+    pass
     # no summary for test network
-    if (not self.is_train):
+    if not self.is_train:
       return
     # Remove 'tower_[0-9]/' from the name in case this is a multi-GPU training
     # session. This helps the clarity of presentation on tensorboard.
@@ -139,19 +133,19 @@ class Network(object):
   def _batch_norm(self, output,
                   lr_mult=1.0, scope='bn', restore=True):
     with tf.variable_scope(scope):
-      shape = self.shape(output)
+      shape = Network.shape(output)
       # we don't squeeze only the last dimension, i.e. feature maps
       squeeze_dims = range(len(shape)-1)
       input_maps = shape[-1]
       batch_mean, batch_var = tf.nn.moments(output, squeeze_dims, name='moments')
-      ema = tf.train.ExponentialMovingAverage(decay=self._decay)
+      ema = tf.train.ExponentialMovingAverage(decay=self.decay)
       ema_apply_op = ema.apply([batch_mean, batch_var])
       # Needed for partial restoration from an existing model
       self._set_restoring(ema.average(batch_mean),
-                          self._append(restore, 'moving_mean'))
+                          Network._append(restore, 'moving_mean'))
       self._set_restoring(ema.average(batch_var),
-                          self._append(restore, 'moving_variance'))
-      if (self.is_train): # and lr_mult > 0):
+                          Network._append(restore, 'moving_variance'))
+      if self.is_train: # and lr_mult > 0):
         with tf.control_dependencies([ema_apply_op]):
           mean, var = tf.identity(batch_mean), tf.identity(batch_var)
       else:
@@ -159,15 +153,14 @@ class Network(object):
         mean, var = ema.average(batch_mean), ema.average(batch_var)
 
       beta = self._constant_variable('beta', [input_maps], 0.0, 0.0,
-                                     lr_mult, self._append(restore, 'beta'))
+                                     lr_mult, Network._append(restore, 'beta'))
       gamma = self._constant_variable('gamma', [input_maps], 1.0, 0.0,
-                                      lr_mult, self._append(restore, 'gamma'))
+                                      lr_mult, Network._append(restore, 'gamma'))
       output = tf.nn.batch_normalization(output, mean, var, beta, gamma, Network.BN_EPS)
       return output
 
 
-  def _pool_layer(self, output,
-                  filter_size=3, stride=2, func='max', scope='pool'):
+  def _pool_layer(self, output, filter_size=3, stride=2, func='max', scope='pool'):
     with tf.variable_scope(scope):
       ksize = [1, filter_size, filter_size, 1]
       strides = [1, stride, stride, 1]
@@ -185,18 +178,18 @@ class Network(object):
   def _conv_layer(self, output, output_maps, filter_size, stride,
                   weight_decay=0.0, lr_mult=1.0,
                   scope='conv', restore=True):
-    input_maps = self.shape(output, 3)
+    input_maps = Network.shape(output, 3)
     filter_shape = [filter_size, filter_size, input_maps, output_maps]
     with tf.variable_scope(scope):
       kernel = self._normal_variable('weights', filter_shape, Network.STDDEV,
                                      weight_decay, lr_mult,
-                                     self._append(restore, 'weights'))
+                                     Network._append(restore, 'weights'))
       output = tf.nn.conv2d(output, kernel, [1, stride, stride, 1], padding='SAME')
       # No biases in resnet convolutional layers
       """
       biases = self._constant_variable('biases', [output_maps], 0.0,
                                        weight_decay, lr_mult,
-                                       self._append(restore, 'biases'))
+                                       Network._append(restore, 'biases'))
       output = tf.nn.bias_add(output, biases)
       """
       return output
@@ -205,19 +198,19 @@ class Network(object):
   def _full_layer(self, output, output_maps, features=None,
                   weight_decay=0.0, lr_mult=1.0,
                   scope='full', restore=True):
-    input_maps = self._output_elem(output)
+    input_maps = Network._output_elem(output)
     with tf.variable_scope(scope):
       output = tf.reshape(output, [-1, input_maps])
       if (features is not None):
         output = tf.concat(concat_dim=1, values=[output, features])
-        input_maps += self._output_elem(features)
+        input_maps += Network._output_elem(features)
       weights = self._normal_variable('weights', [input_maps, output_maps],
                                       1.0/input_maps, weight_decay, lr_mult,
-                                      self._append(restore, 'weights'))
+                                      Network._append(restore, 'weights'))
       output = tf.matmul(output, weights)
       biases = self._constant_variable('biases', [output_maps], 0.0,
                                        weight_decay, lr_mult,
-                                       self._append(restore,'biases'))
+                                       Network._append(restore,'biases'))
       output = tf.add(output, biases)
       return output
 
@@ -225,7 +218,7 @@ class Network(object):
   ### COMPOSED LAYERS ###
 
   def _full_pool(self, output, scope='full_pool'):
-    input_dims = self.shape(output)
+    input_dims = Network.shape(output)
     if (len(input_dims) == 2):
       return
     assert len(input_dims) == 4
@@ -259,26 +252,26 @@ class Network(object):
                   scope='resn_block', restore=True):
     with tf.variable_scope(scope):
       residual = tf.identity(output)
-      input_maps = self.shape(output, 3)
+      input_maps = Network.shape(output, 3)
       if not output_maps:
         output_maps = input_maps
       if (output_maps != input_maps or stride != 1):
         with tf.variable_scope('projection'):
           output = self._conv_layer(output, output_maps, 1, stride,
                                     weight_decay, lr_mult,
-                                    restore=self._append(restore, 'shortcut'))
+                                    restore=Network._append(restore, 'shortcut'))
           output = self._batch_norm(output, lr_mult,
-                                    restore=self._append(restore, 'shortcut'))
+                                    restore=Network._append(restore, 'shortcut'))
 
       residual = self._conv_block(residual, inside_maps, 1, stride,
                                 weight_decay, lr_mult, scope='in',
-                                restore=self._append(restore, 'a'))
+                                restore=Network._append(restore, 'a'))
       residual = self._conv_block(residual, inside_maps, 3, 1,
                                 weight_decay, lr_mult, scope='middle',
-                                restore=self._append(restore, 'b'))
+                                restore=Network._append(restore, 'b'))
       residual = self._conv_block(residual, output_maps, 1, 1,
                                 weight_decay, lr_mult, scope='out',
-                                restore=self._append(restore, 'c'))
+                                restore=Network._append(restore, 'c'))
       output += residual
       self._activation_summary(output)
       return output
@@ -300,7 +293,7 @@ class Network(object):
                   weight_decay=0.0, lr_mult=1.0,
                   scope='last_block', restore=True):
     with tf.variable_scope(scope):
-      output = self._full_layer(output, Reader.CLASSES_NUM, features,
+      output = self._full_layer(output, self.classes_num, features,
                                 weight_decay, lr_mult, restore=restore)
       # No batch_norm in resnet for the fc-layer
       # output = self._batch_norm(output, lr_mult, restore, restscope=restscope)
@@ -309,52 +302,8 @@ class Network(object):
       return output
 
 
-  ### CONSTRUCT ###
-
-  def _construct(self, output, hyper=None, features=None):
-    #with tf.variable_scope('0'):
-    #  output = self._batch_norm(output=False)
-    with tf.variable_scope('1'):
-      output = self._conv_block(output, output_maps=64,
-                                filter_size=7, stride=2, lr_mult=0.0,
-                                scope='conv_block', restore='scale1')
-
-    with tf.variable_scope('2'):
-      output = self._pool_layer(output)
-      for i in range(0, 3):
-        output = self._resn_block(output, inside_maps=64,
-                                  output_maps=256, stride=1, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale2/block'+str(i+1))
-
-    with tf.variable_scope('3'):
-      output = self._resn_block(output, inside_maps=128,
-                                output_maps=512, stride=2, lr_mult=0.0,
-                                scope='1', restore='scale3/block1')
-      for i in range(1, 4):
-        output = self._resn_block(output, inside_maps=128, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale3/block'+str(i+1))
-
-    with tf.variable_scope('4'):
-      output = self._resn_block(output, inside_maps=256,
-                                output_maps=1024, stride=2, lr_mult=0.0,
-                                scope='1', restore='scale4/block1')
-      for i in range(1, 6):
-        output = self._resn_block(output, inside_maps=256, lr_mult=0.0,
-                                  scope=str(i+1), restore='scale4/block'+str(i+1))
-
-    with tf.variable_scope('5'):
-      output = self._resn_block(output, inside_maps=512,
-                                output_maps=2048, stride=2, lr_mult=1.0,
-                                scope='1', restore=False)
-      for i in range(1, 3):
-        output = self._resn_block(output, inside_maps=512, lr_mult=1.0,
-                                  scope=str(i+1), restore=False)
-
-    with tf.variable_scope('6'):
-      output = self._full_pool(output)
-      output = self._last_block(output, features, lr_mult=1.0, scope='last_block', restore=False)
-
-    return output
+  def probs(self):
+    return tf.nn.softmax(self._output)
 
 
   def cross_entropy_losses(self, labels):
@@ -365,45 +314,18 @@ class Network(object):
       )
 
 
-  def total_loss(self, labels):
+  def losses(self, labels):
     cross_entropy = self.cross_entropy_losses(labels)
     with tf.variable_scope('total_loss/' + self._prefix):
       cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
       tf.add_to_collection(Network.LOSSES_NAME, cross_entropy_mean)
       total_loss = tf.add_n(tf.get_collection(Network.LOSSES_NAME))
       # We will be tracking training error manually as well until they fix ema
-      #self._add_loss_summaries(total_loss)
-      return total_loss
+      # self._add_loss_summaries(total_loss)
+    return cross_entropy, total_loss
 
-
-  def probs(self):
-    with tf.variable_scope('probs/' + self._prefix):
-      return tf.nn.softmax(self._output)
 
   """
   def output(self):
     return self._output
-
-
-  def accuracy(self, labels):
-    with tf.variable_scope('accuracy'):
-      #predicted = tf.argmax(self._output, dimension=1)
-      #matched = tf.equal(predicted, labels)
-      #accuracy = tf.reduce_mean(matched)
-      accuracy = tf.nn.in_top_k(self._output, labels, 1)
-      return accuracy
-  """
-
-  """
-    def _add_loss_summaries(self, total_loss):
-      # loss for test is obtained directly from each batch
-      if (not self.is_train):
-        return
-      losses = tf.get_collection(Network.LOSSES_NAME)
-      ema = tf.train.ExponentialMovingAverage(decay=self._decay, name='moving_average')
-      ema_apply_op = ema.apply(losses + [total_loss])
-      with tf.control_dependencies([ema_apply_op]):
-        for l in losses + [total_loss]:
-          self._set_restoring(ema.average(l)=False)
-          tf.scalar_summary(l.op.name, tf.identity(ema.average(l)))
   """
